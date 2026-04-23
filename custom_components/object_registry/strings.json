@@ -1,0 +1,14 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Object Registry",
+        "description": "Set up the Object Registry integration. Once installed, manage your objects via the Object Registry panel in the sidebar."
+      }
+    },
+    "abort": {
+      "already_configured": "Object Registry is already configured."
+    },
+    "error": {}
+  }
+}

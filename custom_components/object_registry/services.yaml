@@ -1,0 +1,47 @@
+list_items:
+  name: List Items
+  description: >
+    Returns metadata for all objects in the registry.
+    Does not include the data payload of each object.
+
+get_item:
+  name: Get Item
+  description: >
+    Returns the data payload for a single object.
+    Provide either object_id or uuid — not both.
+  fields:
+    object_id:
+      name: Object ID
+      description: The snake_case lookup key of the object (e.g. isy_hue_map).
+      required: false
+      example: isy_hue_map
+      selector:
+        text:
+    uuid:
+      name: UUID
+      description: The internal UUID of the object (alternative to object_id).
+      required: false
+      example: 550e8400-e29b-41d4-a716-446655440000
+      selector:
+        text:
+
+get_object:
+  name: Get Object
+  description: >
+    Returns the full object including all metadata and the data payload.
+    Provide either object_id or uuid — not both.
+  fields:
+    object_id:
+      name: Object ID
+      description: The snake_case lookup key of the object (e.g. isy_hue_map).
+      required: false
+      example: isy_hue_map
+      selector:
+        text:
+    uuid:
+      name: UUID
+      description: The internal UUID of the object (alternative to object_id).
+      required: false
+      example: 550e8400-e29b-41d4-a716-446655440000
+      selector:
+        text:
