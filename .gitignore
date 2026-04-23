@@ -1,0 +1,11 @@
+# Project notes (not for repo)
+notes/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# VS Code
+.vscode/settings.json
