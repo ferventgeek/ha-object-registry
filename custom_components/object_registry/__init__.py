@@ -17,7 +17,7 @@ from typing import Any
 from homeassistant.components import panel_custom
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 
 from .const import (
@@ -138,9 +138,20 @@ def _register_services(hass: HomeAssistant) -> None:
 
         raise ServiceValidationError("Must provide either object_id or uuid")
 
-    hass.services.async_register(DOMAIN, "list_items", handle_list_items)
-    hass.services.async_register(DOMAIN, "get_item", handle_get_item)
-    hass.services.async_register(DOMAIN, "get_object", handle_get_object)
+    # SupportsResponse.ONLY tells HA these services return data
+    # and allows response_variable in automations and scripts
+    hass.services.async_register(
+        DOMAIN, "list_items", handle_list_items,
+        supports_response=SupportsResponse.ONLY
+    )
+    hass.services.async_register(
+        DOMAIN, "get_item", handle_get_item,
+        supports_response=SupportsResponse.ONLY
+    )
+    hass.services.async_register(
+        DOMAIN, "get_object", handle_get_object,
+        supports_response=SupportsResponse.ONLY
+    )
 
 
 # ------------------------------------------------------------------

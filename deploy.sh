@@ -25,7 +25,7 @@ if [ ! -f "${ENV_FILE}" ]; then
   exit 1
 fi
 
-# shellcheck source=.env.example
+# shellcheck source=deploy.env
 source "${ENV_FILE}"
 
 # Verify required variables are set

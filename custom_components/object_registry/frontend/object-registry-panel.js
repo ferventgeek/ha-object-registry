@@ -4,7 +4,7 @@
  * A custom sidebar panel for managing the Object Registry.
  * Built as a plain custom element — no build step required.
  *
- * Uses HA's existing web components (ha-input, ha-code-editor, ha-dialog)
+ * Uses HA's existing web components (ha-code-editor, ha-dialog)
  * and CSS custom properties for native look and feel.
  *
  * Communicates with the backend exclusively via WebSocket (this._hass.callWS).
@@ -12,6 +12,13 @@
  * Two views:
  *   LIST VIEW  — sortable table of all objects, collapsed accordion rows
  *   EDIT VIEW  — split panel: list (top) + editor (bottom)
+ *
+ * Bug fixes in this version:
+ *   1. ha-code-editor value set via DOM property after render (not innerHTML attr)
+ *   2. ha-code-editor value-changed event wired after render
+ *   3. FAB hidden during edit/add mode
+ *   4. Sort direction indicator (▲/▼) on active column
+ *   5. Code editor wrapper set to overflow: auto for scrollbars
  */
 
 class ObjectRegistryPanel extends HTMLElement {
@@ -117,9 +124,51 @@ class ObjectRegistryPanel extends HTMLElement {
       ${this._renderDiscardDialog()}
     `;
     this._attachEventListeners();
+
+    // Create ha-code-editor programmatically and append to mount point.
+    // Setting value before appendChild means the element has its value
+    // before Lit's first render, avoiding async timing issues.
+    if (isEditing) {
+      const mount = this.shadowRoot.getElementById("code-editor-mount");
+      if (mount) {
+        const editor = document.createElement("ha-code-editor");
+        editor.id = "field-data";
+        editor.mode = "jinja2";
+        editor.style.height = "100%";
+        editor.style.display = "block";
+        editor.value = this._form.data || "";
+        editor.addEventListener("value-changed", (e) => {
+          this._form.data = e.detail.value;
+          this._updateSaveButton();
+        });
+        mount.appendChild(editor);
+
+        // Inject CSS into ha-code-editor's Shadow DOM to force CM6 to fill
+        // container height and scroll. This cannot be done from outside Shadow DOM.
+        // Tribal knowledge: target .cm-editor and .cm-scroller (CM6 class names).
+        setTimeout(() => {
+          if (editor.shadowRoot) {
+            const style = document.createElement("style");
+            style.textContent = `
+              :host, .editor, .cm-editor {
+                height: 100% !important;
+                display: flex !important;
+                flex-direction: column !important;
+              }
+              .cm-scroller {
+                flex: 1 !important;
+                overflow: auto !important;
+              }
+            `;
+            editor.shadowRoot.appendChild(style);
+          }
+        }, 0);
+      }
+    }
   }
 
   _renderListView() {
+    // FIX 3: FAB only shown in list view, not during edit/add
     return `
       <div class="list-view">
         ${this._renderTableHeader()}
@@ -142,6 +191,7 @@ class ObjectRegistryPanel extends HTMLElement {
       o => o.uuid !== this._editingUuid
     );
 
+    // FIX 3: No FAB in split view — Add item not available during edit
     return `
       <div class="split-view">
         <div class="split-top">
@@ -155,27 +205,30 @@ class ObjectRegistryPanel extends HTMLElement {
           ${this._renderEditor(editingObj)}
         </div>
       </div>
-      <button class="fab" id="btn-add" title="Add item">
-        <span class="fab-icon">+</span> Add item
-      </button>
     `;
   }
 
   _renderTableHeader() {
+    // FIX 4: Show sort direction indicator on active column
+    const indicator = (col) => {
+      if (this._sortBy !== col) return "";
+      return this._sortAsc ? " ▲" : " ▼";
+    };
+
     return `
       <div class="table-header">
         <div class="col-icon"></div>
         <div class="col-object">
           <span class="sortable ${this._sortBy === "name" ? "sorted" : ""}"
-                data-sort="name">Object</span>
+                data-sort="name">Object${indicator("name")}</span>
         </div>
         <div class="col-id">
           <span class="sortable ${this._sortBy === "object_id" ? "sorted" : ""}"
-                data-sort="object_id">Object ID</span>
+                data-sort="object_id">Object ID${indicator("object_id")}</span>
         </div>
         <div class="col-updated">
           <span class="sortable ${this._sortBy === "updated" ? "sorted" : ""}"
-                data-sort="updated">Last update</span>
+                data-sort="updated">Last update${indicator("updated")}</span>
         </div>
         <div class="col-type">Type</div>
         <div class="col-chevron"></div>
@@ -222,6 +275,8 @@ class ObjectRegistryPanel extends HTMLElement {
     const form = this._form;
     const isDirty = this._isDirty();
 
+    // Note: ha-code-editor value is NOT set here — it is set after render
+    // via DOM property in _render(). See FIX 1 comment there.
     return `
       <div class="editor">
         <div class="editor-header">
@@ -278,13 +333,7 @@ class ObjectRegistryPanel extends HTMLElement {
           ${_escape(this._warnMessage)}
         </div>` : ""}
 
-        <div class="code-editor-wrapper">
-          <ha-code-editor
-            id="field-data"
-            mode="jinja2"
-            .value="${_escape(form.data)}"
-            autofocus
-          ></ha-code-editor>
+        <div class="code-editor-wrapper" id="code-editor-mount">
         </div>
 
         <div class="editor-buttons">
@@ -382,7 +431,7 @@ class ObjectRegistryPanel extends HTMLElement {
       row.addEventListener("click", () => this._handleRowClick(row.dataset.uuid));
     });
 
-    // Add button
+    // Add button (list view only)
     const btnAdd = root.getElementById("btn-add");
     if (btnAdd) btnAdd.addEventListener("click", () => this._handleAdd());
 
@@ -418,11 +467,9 @@ class ObjectRegistryPanel extends HTMLElement {
       this._updateSaveButton();
     });
 
-    const fieldData = root.getElementById("field-data");
-    if (fieldData) fieldData.addEventListener("value-changed", e => {
-      this._form.data = e.detail.value;
-      this._updateSaveButton();
-    });
+    // Note: ha-code-editor value-changed is wired in _render() after DOM exists
+
+    // Note: ha-code-editor handles tab key natively via CodeMirror
 
     // Dialog buttons
     root.getElementById("dialog-delete-cancel")
@@ -455,9 +502,8 @@ class ObjectRegistryPanel extends HTMLElement {
     this._render();
   }
 
-  _handleRowClick(uuid) {
+  async _handleRowClick(uuid) {
     if (this._isDirty()) {
-      // Show discard confirmation before switching
       this._pendingUuid = uuid;
       const obj = this._objects.find(o => o.uuid === this._editingUuid);
       const other = this._objects.find(o => o.uuid === uuid);
@@ -469,7 +515,7 @@ class ObjectRegistryPanel extends HTMLElement {
       this.shadowRoot.getElementById("dialog-discard").showModal();
       return;
     }
-    this._openEditor(uuid);
+    await this._openEditor(uuid);
   }
 
   _handleAdd() {
@@ -512,7 +558,6 @@ class ObjectRegistryPanel extends HTMLElement {
     // Check if object_id is being renamed (edit mode only)
     const original = this._originalForm;
     if (!this._isAdding && original && form.object_id !== original.object_id) {
-      // Show rename confirmation dialog
       const oldId = this.shadowRoot.getElementById("rename-old-id");
       const newId = this.shadowRoot.getElementById("rename-new-id");
       if (oldId) oldId.textContent = original.object_id;
@@ -531,6 +576,14 @@ class ObjectRegistryPanel extends HTMLElement {
 
   async _submitSave() {
     const form = this._form;
+
+    // Safety net: read editor value directly from DOM before submitting
+    const mount = this.shadowRoot.getElementById("code-editor-mount");
+    const editor = mount ? mount.querySelector("ha-code-editor") : null;
+    if (editor && editor.value !== undefined && editor.value !== null) {
+      form.data = editor.value;
+    }
+
     try {
       if (this._isAdding) {
         await this._hass.callWS({
@@ -577,7 +630,7 @@ class ObjectRegistryPanel extends HTMLElement {
     }
   }
 
-  _handleDiscardConfirm() {
+  async _handleDiscardConfirm() {
     this.shadowRoot.getElementById("dialog-discard").close();
     if (this._pendingAdd) {
       this._pendingAdd = false;
@@ -585,7 +638,7 @@ class ObjectRegistryPanel extends HTMLElement {
     } else if (this._pendingUuid) {
       const uuid = this._pendingUuid;
       this._pendingUuid = null;
-      this._openEditor(uuid);
+      await this._openEditor(uuid);
     }
   }
 
@@ -593,8 +646,17 @@ class ObjectRegistryPanel extends HTMLElement {
   // Editor state helpers
   // ------------------------------------------------------------------
 
-  _openEditor(uuid) {
-    const obj = this._objects.find(o => o.uuid === uuid);
+  async _openEditor(uuid) {
+    // Fetch the full object including data payload from the backend.
+    // The list view only has metadata (list_items strips the payload),
+    // so we need a separate get call to load the data field.
+    let obj;
+    try {
+      obj = await this._hass.callWS({ type: "object_registry/get", uuid });
+    } catch (err) {
+      console.error("Object Registry: failed to load object", err);
+      return;
+    }
     if (!obj) return;
 
     this._editingUuid = uuid;
@@ -964,7 +1026,10 @@ function _styles() {
     /* ---- Code editor ---- */
 
     .code-editor-wrapper {
-      flex: 1;
+      flex: 1 1 0%;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
       overflow: hidden;
       margin: 8px 24px;
       border: 1px solid var(--divider-color);
@@ -972,7 +1037,11 @@ function _styles() {
     }
 
     ha-code-editor {
+      flex: 1 1 0%;
       height: 100%;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
     }
 
     /* ---- Button row ---- */
