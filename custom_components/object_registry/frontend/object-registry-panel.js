@@ -57,6 +57,9 @@ class ObjectRegistryPanel extends HTMLElement {
     if (!this._loaded) {
       this._loaded = true;
       this._load();
+    } else if (hass && this._objects.length === 0) {
+      // hass reconnected after session timeout and we lost our data — reload
+      this._load();
     }
   }
 
@@ -110,6 +113,11 @@ class ObjectRegistryPanel extends HTMLElement {
   // ------------------------------------------------------------------
 
   _render() {
+    // Guard against rendering before hass is available or after session timeout
+    if (!this._hass) {
+      this.shadowRoot.innerHTML = `<style>${_styles()}</style>`;
+      return;
+    }
     const isEditing = this._editingUuid !== null || this._isAdding;
     this.shadowRoot.innerHTML = `
       <style>${_styles()}</style>
@@ -256,7 +264,11 @@ class ObjectRegistryPanel extends HTMLElement {
         <div class="col-updated obj-updated">${_relativeTime(obj.updated)}</div>
         <div class="col-type obj-type">${_escape(obj.type.toUpperCase())}</div>
         <div class="col-chevron">
-          <span class="chevron">&#8964;</span>
+          <svg class="chevron-icon" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet"
+               style="width:20px;height:20px;transform:rotate(90deg);color:var(--secondary-text-color);"
+               fill="currentColor">
+            <path d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/>
+          </svg>
         </div>
       </div>
     `;
@@ -303,19 +315,22 @@ class ObjectRegistryPanel extends HTMLElement {
                        value="${_escape(form.object_id)}"
                        placeholder="new_registry_object" />
               </div>
-              <div class="col-type obj-type">
+              <div class="editor-type-badge">
                 ${isAdd ? "JSON" : _escape((obj?.type || "json").toUpperCase())}
               </div>
+              <div></div>
             </div>
             <div class="editor-row-desc">
-              <input class="ha-input ha-input-full" id="field-description" type="text"
-                     value="${_escape(form.description)}"
-                     placeholder="description" />
+              <div style="display:flex;flex-direction:column;flex:1;">
+                <label class="field-label">description</label>
+                <input class="ha-input ha-input-full" id="field-description" type="text"
+                       value="${_escape(form.description)}"
+                       placeholder="Optional description" />
+              </div>
             </div>
             ${!isAdd && obj ? `
             <div class="editor-timestamps">
-              <span>Created: ${_formatDateTime(obj.created)}</span>
-              <span>Updated: ${_formatDateTime(obj.updated)}</span>
+              <span>Updated: ${_formatDateTime(obj.updated)}&nbsp;&nbsp;Created: ${_formatDateTime(obj.created)}</span>
             </div>
             ` : ""}
           </div>
@@ -797,8 +812,10 @@ function _styles() {
 
     .panel-header h1 {
       margin: 0 0 16px;
-      font-size: 20px;
-      font-weight: 500;
+      font-size: var(--sidebar-title-font-size, 20px);
+      font-weight: var(--sidebar-font-weight, 400);
+      color: var(--sidebar-text-color, var(--primary-text-color));
+      line-height: 1.2;
     }
 
     /* ---- List view ---- */
@@ -844,12 +861,21 @@ function _styles() {
     }
 
     .table-header {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--primary-background-color);
       font-weight: 500;
       color: var(--secondary-text-color);
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       padding: 12px 0 8px;
+      align-items: center;
+    }
+    /* Sticky header in split-top uses secondary background */
+    .split-top .table-header {
+      background: var(--primary-background-color);
     }
 
     .object-row {
@@ -873,9 +899,10 @@ function _styles() {
     }
 
     .obj-icon {
-      width: 32px;
-      height: 32px;
+      width: 28px;
+      height: 28px;
       color: var(--secondary-text-color);
+      opacity: 0.6;
     }
 
     .obj-icon svg {
@@ -900,8 +927,8 @@ function _styles() {
 
     .obj-id {
       color: var(--secondary-text-color);
-      font-family: monospace;
-      font-size: 13px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.95em;
     }
 
     .obj-updated {
@@ -909,7 +936,9 @@ function _styles() {
     }
 
     .obj-type {
-      font-weight: 500;
+      font-weight: 400;
+      color: var(--secondary-text-color);
+      font-size: 14px;
     }
 
     .chevron {
@@ -937,41 +966,75 @@ function _styles() {
     .editor-header {
       display: grid;
       grid-template-columns: 48px 1fr;
-      gap: 8px;
-      padding: 12px 24px;
+      gap: 0;
+      padding: 8px 24px 4px 24px;
       align-items: start;
     }
 
     .editor-fields {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 4px;
     }
 
     .editor-row-top {
       display: grid;
-      grid-template-columns: 1fr 160px auto;
-      gap: 12px;
+      grid-template-columns: 1fr 320px 80px 40px;
+      gap: 0;
       align-items: end;
+      padding-right: 0;
+    }
+
+    .field-name {
+      padding-right: 8px;
+    }
+
+    .field-object-id {
+      padding-right: 12px;
+    }
+
+    .editor-type-badge {
+      display: flex;
+      align-items: flex-end;
+      padding-bottom: 7px;
+      padding-left: -4px;
+      font-weight: 400;
+      color: var(--secondary-text-color);
+      font-size: 14px;
     }
 
     .editor-row-desc {
-      display: flex;
+      display: grid;
+      padding-right: 4px;
+      grid-template-columns: 1fr 320px 80px 40px;
+      gap: 0;
+    }
+
+    .editor-row-desc > div {
+      grid-column: 1 / 3;
+      padding-right: 8px;
     }
 
     .editor-timestamps {
-      display: flex;
-      gap: 24px;
+      display: grid;
+      grid-template-columns: 1fr 320px 80px 40px;
+      gap: 0;
       font-size: 12px;
       color: var(--secondary-text-color);
       padding-top: 2px;
     }
 
+    .editor-timestamps span {
+      grid-column: 1 / 3;
+      display: flex;
+      gap: 24px;
+    }
+
     .field-label {
       display: block;
-      font-size: 11px;
+      font-size: 12px;
       color: var(--secondary-text-color);
-      margin-bottom: 2px;
+      margin-bottom: 3px;
     }
 
     .ha-input {
@@ -1031,7 +1094,7 @@ function _styles() {
       flex-direction: column;
       min-height: 0;
       overflow: hidden;
-      margin: 8px 24px;
+      margin: 4px 24px 8px 24px;
       border: 1px solid var(--divider-color);
       border-radius: 4px;
     }
@@ -1050,8 +1113,7 @@ function _styles() {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 24px;
-      border-top: 1px solid var(--divider-color);
+      padding: 2px 24px 18px 24px;
       background: var(--secondary-background-color);
       flex-shrink: 0;
     }

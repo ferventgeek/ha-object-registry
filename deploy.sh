@@ -62,7 +62,7 @@ echo ""
 # ------------------------------------------------------------------
 
 echo "[1/3] Syncing files to Pi staging..."
-rsync -av --delete \
+rsync -av --delete --checksum \
   "${LOCAL_SRC}/" \
   "${PI_HOST}:${PI_STAGING}/object_registry/"
 echo "      Done."
