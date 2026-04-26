@@ -51,20 +51,26 @@ class ObjectRegistryPanel extends HTMLElement {
     this._onRegistryUpdated = this._onRegistryUpdated.bind(this);
   }
 
-  // HA sets this property with the hass object whenever it changes
+  // HA sets this property with the hass object whenever it changes.
+  // Called frequently — treat every assignment as a potential reconnect.
   set hass(hass) {
     this._hass = hass;
-    if (!this._loaded) {
+
+    if (!hass) {
+      // hass temporarily unavailable — preserve DOM, do not wipe
+      this._render();
+      return;
+    }
+
+    if (!this._loaded || this._objects.length === 0 || !this._unsubscribeEvents) {
+      // First load, data lost, or event subscription dropped — reload everything
       this._loaded = true;
       this._load();
-    } else if (hass && this._objects.length === 0) {
-      // hass reconnected after session timeout and we lost our data — reload
-      this._load();
-    } else if (hass && !this.shadowRoot.querySelector('.panel')) {
-      // DOM was blanked during reconnection but data is intact — force re-render
-      // without reloading from backend. Fixes panel disappearing after tab switch.
-      this._render();
+      return;
     }
+
+    // hass updated normally — re-render with current data
+    this._render();
   }
 
   // HA sets this with panel config
@@ -74,6 +80,11 @@ class ObjectRegistryPanel extends HTMLElement {
 
   connectedCallback() {
     this._render();
+    // If hass is already available and subscription was lost (e.g. after
+    // disconnect/reconnect), reload to resubscribe and refresh data.
+    if (this._hass && !this._unsubscribeEvents) {
+      this._load();
+    }
   }
 
   disconnectedCallback() {
@@ -130,9 +141,18 @@ class ObjectRegistryPanel extends HTMLElement {
   // ------------------------------------------------------------------
 
   _render() {
-    // Guard against rendering before hass is available or after session timeout
+    // If hass is temporarily unavailable (e.g. tab backgrounded), preserve
+    // the last rendered DOM rather than wiping it. Only show placeholder if
+    // the DOM is completely empty (e.g. first load before hass is set).
     if (!this._hass) {
-      this.shadowRoot.innerHTML = `<style>${_styles()}</style>`;
+      if (!this.shadowRoot.querySelector('.panel')) {
+        this.shadowRoot.innerHTML = `
+          <style>${_styles()}</style>
+          <div class="panel">
+            <div class="panel-header"><h1>Object Registry Catalog</h1></div>
+            <div class="empty-state">Reconnecting...</div>
+          </div>`;
+      }
       return;
     }
     const isEditing = this._editingUuid !== null || this._isAdding;
@@ -354,16 +374,12 @@ class ObjectRegistryPanel extends HTMLElement {
         </div>
 
         ${this._errorMessage ? `
-        <div class="banner banner-error">
-          <span class="banner-icon">&#9888;</span>
-          ${_escape(this._errorMessage)}
-        </div>` : ""}
+        <ha-alert alert-type="error" class="banner">${_escape(this._errorMessage)}</ha-alert>
+        ` : ""}
 
         ${this._warnMessage ? `
-        <div class="banner banner-warn">
-          <span class="banner-icon">&#9888;</span>
-          ${_escape(this._warnMessage)}
-        </div>` : ""}
+        <ha-alert alert-type="warning" class="banner">${_escape(this._warnMessage)}</ha-alert>
+        ` : ""}
 
         <div class="code-editor-wrapper" id="code-editor-mount">
         </div>
@@ -1085,31 +1101,11 @@ function _styles() {
     }
 
     /* ---- Banners ---- */
+    /* ha-alert handles all theming internally — we just control margin */
 
     .banner {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      padding: 10px 24px;
-      font-size: 13px;
-      margin: 0 24px;
-      border-radius: 4px;
-    }
-
-    .banner-error {
-      background: rgba(var(--rgb-error-color, 244,67,54), 0.1);
-      color: var(--error-color, #f44336);
-      border: 1px solid var(--error-color, #f44336);
-    }
-
-    .banner-warn {
-      background: rgba(var(--rgb-warning-color, 255,152,0), 0.0);
-      color: var(--warning-color, #ff9800);
-      border: 1px solid var(--warning-color, #ff9800);
-    }
-
-    .banner-icon {
-      flex-shrink: 0;
+      margin: 4px 24px;
+      display: block;
     }
 
     /* ---- Code editor ---- */
