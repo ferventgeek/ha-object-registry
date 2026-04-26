@@ -1,12 +1,12 @@
 {
   "domain": "object_registry",
   "name": "Object Registry",
-  "version": "0.1.0",
-  "documentation": "https://github.com/ferventgeek/ha-object-registry",
-  "issue_tracker": "https://github.com/ferventgeek/ha-object-registry/issues",
-  "dependencies": ["http", "frontend", "panel_custom"],
   "codeowners": ["@ferventgeek"],
-  "requirements": [],
+  "config_flow": true,
+  "dependencies": ["http", "frontend", "panel_custom"],
+  "documentation": "https://github.com/ferventgeek/ha-object-registry",
   "iot_class": "local_push",
-  "config_flow": true
+  "issue_tracker": "https://github.com/ferventgeek/ha-object-registry/issues",
+  "requirements": [],
+  "version": "0.1.0"
 }
