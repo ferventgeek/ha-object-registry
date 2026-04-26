@@ -1,6 +1,9 @@
 # Project notes (not for repo)
 notes/
 
+# macOS
+**/.DS_Store
+
 # Python
 # Byte-compiled / optimized / DLL files
 __pycache__/
