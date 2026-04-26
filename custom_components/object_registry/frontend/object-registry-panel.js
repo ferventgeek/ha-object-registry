@@ -13,18 +13,22 @@
  *   LIST VIEW  — sortable table of all objects, collapsed accordion rows
  *   EDIT VIEW  — split panel: list (top) + editor (bottom)
  *
- * Bug fixes in this version:
- *   1. ha-code-editor value set via DOM property after render (not innerHTML attr)
- *   2. ha-code-editor value-changed event wired after render
- *   3. FAB hidden during edit/add mode
- *   4. Sort direction indicator (▲/▼) on active column
- *   5. Code editor wrapper set to overflow: auto for scrollbars
+ * Panel lifecycle:
+ *   - constructor: reuses existing shadow root if HA created one via DSD
+ *   - set hass: primary entry point, triggers load or render as needed
+ *   - connectedCallback: renders current state
+ *   - disconnectedCallback: cleans up WebSocket subscription
  */
 
 class ObjectRegistryPanel extends HTMLElement {
   constructor() {
     super();
-    this.attachShadow({ mode: "open" });
+    // If HA serialized our shadow DOM during tab backgrounding (Declarative
+    // Shadow DOM), the shadow root already exists — reuse it instead of
+    // calling attachShadow() again which would throw or replace it.
+    if (!this.shadowRoot) {
+      this.attachShadow({ mode: "open" });
+    }
 
     // HA injects these properties
     this._hass = null;
@@ -52,18 +56,17 @@ class ObjectRegistryPanel extends HTMLElement {
   }
 
   // HA sets this property with the hass object whenever it changes.
-  // Called frequently — treat every assignment as a potential reconnect.
   set hass(hass) {
+    console.log("[OR] set hass called", !!hass, !!this.shadowRoot.querySelector('.panel'));
     this._hass = hass;
 
     if (!hass) {
       // hass temporarily unavailable — preserve DOM, do not wipe
-      this._render();
       return;
     }
 
-    if (!this._loaded || this._objects.length === 0 || !this._unsubscribeEvents) {
-      // First load, data lost, or event subscription dropped — reload everything
+    if (!this._loaded || !this.shadowRoot.querySelector(".panel")) {
+      // First load or DOM was wiped (e.g. DSD restore after tab switch)
       this._loaded = true;
       this._load();
       return;
@@ -80,11 +83,21 @@ class ObjectRegistryPanel extends HTMLElement {
 
   connectedCallback() {
     this._render();
-    // If hass is already available and subscription was lost (e.g. after
-    // disconnect/reconnect), reload to resubscribe and refresh data.
-    if (this._hass && !this._unsubscribeEvents) {
-      this._load();
-    }
+    // WORKAROUND: HA's partial-panel-resolver removes our element from
+    // ha-panel-custom after Chrome throttles background tabs (~5 min).
+    // HA's router then thinks it's already on this panel and won't remount.
+    // Fix: on every tab return, force a navigate-away-and-back so HA
+    // remounts the element cleanly. Cost is one WebSocket reload per tab
+    // return — acceptable. Unsaved editor state is lost, which is fine
+    // since HA already destroyed the element.
+    this._visibilityHandler = () => {
+      if (document.visibilityState !== "visible") return;
+      const current = window.location.pathname;
+      window.history.pushState(null, "", "/");
+      window.history.pushState(null, "", current);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    };
+    document.addEventListener("visibilitychange", this._visibilityHandler);
   }
 
   disconnectedCallback() {
@@ -92,6 +105,11 @@ class ObjectRegistryPanel extends HTMLElement {
     if (this._unsubscribeEvents) {
       this._unsubscribeEvents();
       this._unsubscribeEvents = null;
+    }
+    // Clean up visibility listener
+    if (this._visibilityHandler) {
+      document.removeEventListener("visibilitychange", this._visibilityHandler);
+      this._visibilityHandler = null;
     }
   }
 
@@ -108,13 +126,27 @@ class ObjectRegistryPanel extends HTMLElement {
       // Subscribe to backend registry update events via HA WebSocket.
       // This replaces window.addEventListener which cannot receive HA bus events.
       // Called after every load to handle reconnection; guard prevents duplicates.
+      // Subscribe to registry update events. Wrap in its own try/catch so
+      // a dead subscription (e.g. after tab throttling) doesn't crash _load.
       if (!this._unsubscribeEvents && this._hass.connection) {
-        this._unsubscribeEvents = await this._hass.connection.subscribeEvents(
-          (event) => this._onRegistryUpdated(event),
-          "object_registry_updated"
-        );
+        try {
+          this._unsubscribeEvents = await this._hass.connection.subscribeEvents(
+            (event) => this._onRegistryUpdated(event),
+            "object_registry_updated"
+          );
+        } catch (subErr) {
+          // Subscription failed — clear so next load will retry
+          console.debug("Object Registry: subscription failed, will retry", subErr.message);
+          this._unsubscribeEvents = null;
+        }
       }
     } catch (err) {
+      if (err.name === "AbortError") {
+        // HA navigation transition interrupted — _loaded stays false so
+        // the next hass assignment will retry _load() automatically.
+        this._loaded = false;
+        return;
+      }
       console.error("Object Registry: failed to load objects", err);
     }
   }
@@ -141,20 +173,7 @@ class ObjectRegistryPanel extends HTMLElement {
   // ------------------------------------------------------------------
 
   _render() {
-    // If hass is temporarily unavailable (e.g. tab backgrounded), preserve
-    // the last rendered DOM rather than wiping it. Only show placeholder if
-    // the DOM is completely empty (e.g. first load before hass is set).
-    if (!this._hass) {
-      if (!this.shadowRoot.querySelector('.panel')) {
-        this.shadowRoot.innerHTML = `
-          <style>${_styles()}</style>
-          <div class="panel">
-            <div class="panel-header"><h1>Object Registry Catalog</h1></div>
-            <div class="empty-state">Reconnecting...</div>
-          </div>`;
-      }
-      return;
-    }
+    if (!this._hass) return;
     const isEditing = this._editingUuid !== null || this._isAdding;
     this.shadowRoot.innerHTML = `
       <style>${_styles()}</style>
@@ -897,6 +916,11 @@ function _styles() {
       border-bottom: 1px solid var(--divider-color);
     }
 
+    .object-row > div:nth-child(2) {
+      min-width: 0;
+      padding-right: 12px;
+    }
+
     .table-header {
       position: sticky;
       top: 0;
@@ -959,7 +983,6 @@ function _styles() {
       font-size: 12px;
       white-space: nowrap;
       overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .obj-id {
@@ -1321,5 +1344,6 @@ function _styles() {
   `;
 }
 
-customElements.define("object-registry-panel", ObjectRegistryPanel);
-
+if (!customElements.get("object-registry-panel")) {
+  customElements.define("object-registry-panel", ObjectRegistryPanel);
+}

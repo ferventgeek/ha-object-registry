@@ -47,16 +47,16 @@ _index: dict[str, str] = {
 
 These rules are enforced on every create and update before any write occurs:
 
-| Field | Rule |
-|-------|------|
-| `object_id` | Required. Must match `^[a-z0-9_]+$`. Must be unique across all objects. |
-| `name` | Required. Must be unique across all objects. |
-| `description` | Optional. No format constraint. |
-| `data` | Must be valid JSON (deserializable). |
-| `uuid` | Generated internally. Never accepted as user input. |
-| `created` | Set on create. Never modified after that. |
-| `updated` | Set on create. Updated on every subsequent change to any field. |
-| `type` | Always set to `"json"`. Never accepted as user input in v1. |
+| Field         | Rule                                                                    |
+| ------------- | ----------------------------------------------------------------------- |
+| `object_id`   | Required. Must match `^[a-z0-9_]+$`. Must be unique across all objects. |
+| `name`        | Required. Must be unique across all objects.                            |
+| `description` | Optional. No format constraint.                                         |
+| `data`        | Must be valid JSON (deserializable).                                    |
+| `uuid`        | Generated internally. Never accepted as user input.                     |
+| `created`     | Set on create. Never modified after that.                               |
+| `updated`     | Set on create. Updated on every subsequent change to any field.         |
+| `type`        | Always set to `"json"`. Never accepted as user input in v1.             |
 
 ### 1.4 Metadata vs Payload
 
@@ -98,6 +98,7 @@ Returns metadata for all objects in the registry. No payload data is included.
 **Error cases:** None. Returns empty list if registry is empty.
 
 **Example automation usage:**
+
 ```yaml
 action:
   - service: object_registry.list_items
@@ -143,6 +144,7 @@ fields:
 ```
 
 **Error cases:**
+
 - `object_id` not found → raise `ServiceValidationError` with message:
   `"No object found with object_id '{object_id}'"`
 - `uuid` not found → raise `ServiceValidationError` with message:
@@ -151,6 +153,7 @@ fields:
   `"Must provide either object_id or uuid"`
 
 **Example automation usage:**
+
 ```yaml
 action:
   - service: object_registry.get_item
@@ -191,6 +194,7 @@ data:
 **Error cases:** Same as `get_item`.
 
 **Example automation usage:**
+
 ```yaml
 action:
   - service: object_registry.get_object
@@ -204,6 +208,7 @@ action:
 ## 3. CRUD Operations
 
 All CRUD operations follow this sequence without exception:
+
 1. Validate inputs
 2. Update `_objects` (primary dict)
 3. Update `_index` (lookup dict)
@@ -223,6 +228,7 @@ All CRUD operations follow this sequence without exception:
 10. Flush to Store
 
 **Default values for new objects (shown as placeholders in panel):**
+
 - `name`: `"New Registry Object"`
 - `object_id`: `"new_registry_object"`
 - `description`: `""` (empty)
@@ -278,6 +284,7 @@ framework. It is not exposed in individual object dicts.
 ### 4.2 Startup (Load)
 
 On integration setup:
+
 1. Call `await store.async_load()`
 2. If result is `None` (first run): initialize empty `_objects` and `_index`
 3. If result has data: populate `_objects` from stored data, rebuild `_index`
@@ -286,6 +293,7 @@ On integration setup:
 ### 4.3 Flush (Save)
 
 On every CRUD operation after updating the in-memory dicts:
+
 ```python
 await store.async_save({"objects": list(_objects.values())})
 ```
@@ -309,6 +317,7 @@ See `docs/wireframes/` for visual reference. This section defines behavior.
 A full-width panel registered in the HA sidebar as "Object Registry".
 
 **Table columns (left to right):**
+
 - Icon (project cube logo, decorative, visual anchor)
 - Object: `name` (larger, slightly darker) with `description` below
   (slightly less saturated, truncates with ellipsis at column boundary)
@@ -334,6 +343,7 @@ view, then activates edit view.
 ### 5.2 Edit / Add View
 
 Triggered by expanding a row or clicking `+ Add item`. The panel splits:
+
 - **Top ~1/3:** Scrollable list of all objects except the one being edited
 - **Bottom ~2/3:** Editor anchored to bottom of panel
 
@@ -353,15 +363,15 @@ placeholder default values and the Restore and Delete controls are hidden.
 
 **Field details:**
 
-| Field | Required | Editable | Notes |
-|-------|----------|----------|-------|
-| `name` | Yes (`*`) | Yes | Unique. Placeholder: "New Registry Object" |
-| `object_id` | Yes (`*`) | Yes | Unique, snake_case. Placeholder: "new_registry_object" |
-| `description` | No | Yes | Placeholder hint text shown when empty |
-| `type` | — | No | Read-only display, always "JSON" |
-| `created` | — | No | Local timezone, full date and time |
-| `updated` | — | No | Local timezone, full date and time |
-| `data` | — | Yes | Edited in `ha-code-editor`. Placeholder: `{ "key": "value" }` |
+| Field         | Required  | Editable | Notes                                                         |
+| ------------- | --------- | -------- | ------------------------------------------------------------- |
+| `name`        | Yes (`*`) | Yes      | Unique. Placeholder: "New Registry Object"                    |
+| `object_id`   | Yes (`*`) | Yes      | Unique, snake_case. Placeholder: "new_registry_object"        |
+| `description` | No        | Yes      | Placeholder hint text shown when empty                        |
+| `type`        | —         | No       | Read-only display, always "JSON"                              |
+| `created`     | —         | No       | Local timezone, full date and time                            |
+| `updated`     | —         | No       | Local timezone, full date and time                            |
+| `data`        | —         | Yes      | Edited in `ha-code-editor`. Placeholder: `{ "key": "value" }` |
 
 **`object_id` field** is intentionally shorter than `name` to encourage brief
 snake_case names that are easy to type in automation YAML.
@@ -373,6 +383,7 @@ Left edge aligns with all other editor elements. Right edge aligns with the
 end of the Last update column. Goes multi-line if needed.
 
 **Error banner (pink, `--error-color`):**
+
 - Shown when Save validation fails
 - Includes warning icon + message text
 - Message includes line number if available from `ha-code-editor`
@@ -382,11 +393,12 @@ end of the Last update column. Goes multi-line if needed.
 - Example: `Invalid JSON at line 4`
 
 **Warning banner (amber, `--warning-color`):**
+
 - Shown when a WebSocket event indicates the current object was modified
   externally while the editor is open
 - Non-blocking (does not disable Save)
 - Text: `"This object was modified in another window. Saving will overwrite
-  those changes. Use Restore to load the current version."`
+those changes. Use Restore to load the current version."`
 - Fields and editor are NOT updated automatically
 
 ### 5.4 Button Row
@@ -394,40 +406,45 @@ end of the Last update column. Goes multi-line if needed.
 Full-width row pinned to the bottom of the editor area. Not a floater.
 
 **Edit mode (left to right):**
+
 ```
 [Delete object]                    [Restore]  [Cancel]  [Save]
 ```
 
 **Add mode (left to right):**
+
 ```
                                               [Cancel]  [Save]
 ```
 
 **Button behaviors:**
 
-| Button | Style | Enabled when | Action |
-|--------|-------|-------------|--------|
-| `Save` | Primary (filled) | Any field differs from opened state | Validate → confirm if needed → write |
-| `Cancel` | Secondary (outlined) | Always | Discard changes, collapse row |
-| `Restore` | Text/subtle | Always (edit mode only) | Reload fields from current cache state |
-| `Delete object` | Text, `--error-color` muted, hover brightens | Always (edit mode only) | Confirmation dialog → delete |
+| Button          | Style                                        | Enabled when                        | Action                                 |
+| --------------- | -------------------------------------------- | ----------------------------------- | -------------------------------------- |
+| `Save`          | Primary (filled)                             | Any field differs from opened state | Validate → confirm if needed → write   |
+| `Cancel`        | Secondary (outlined)                         | Always                              | Discard changes, collapse row          |
+| `Restore`       | Text/subtle                                  | Always (edit mode only)             | Reload fields from current cache state |
+| `Delete object` | Text, `--error-color` muted, hover brightens | Always (edit mode only)             | Confirmation dialog → delete           |
 
 ### 5.5 Confirmation Dialogs
 
 All confirmations use native `ha-dialog`.
 
 **On Save with object_id change:**
+
 > Title: "Rename object ID?"
 > Body: "Changing the object_id from `old_id` to `new_id` may break Automations,
 > Scripts, or other integrations that reference `old_id`."
 > Buttons: [Cancel] [Confirm rename and save]
 
 **On Delete:**
+
 > Title: "Delete [name]?"
 > Body: "This cannot be undone."
 > Buttons: [Cancel] [Delete]
 
 **On clicking another object while editing with unsaved changes:**
+
 > Title: "Unsaved changes"
 > Body: "You have unsaved changes to [name]. Discard them and open [other name]?"
 > Buttons: [Keep editing] [Discard and open]
@@ -488,10 +505,6 @@ get_object:
 
 ## 7. Open Questions
 
-Items deferred for future decisions — do not implement until resolved.
-
-| # | Question | Notes |
-|---|----------|-------|
-| 1 | Exact HA WebSocket event name for registry changes | Determine during `__init__.py` implementation |
-| 2 | Whether `ha-code-editor` requires any special import in panel.js | Verify against HA Lollipop frontend source |
-| 3 | Config flow — minimal entry only, or does it need options flow? | Likely minimal only; confirm during implementation |
+| #   | Question                                                                                                              | Resolution                                                                                                                                                                                                                                                                                                    |
+| --- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Custom panel lifecycle — how does `partial-panel-resolver` manage `ha-panel-custom` during background tab throttling? | **Unresolved.** After ~5 min, Chrome throttles JS and HA removes `<object-registry-panel>` from `<ha-panel-custom>` entirely. On tab return the router sees the panel as already active and doesn't remount. Navigation workaround in place but not fully reliable. Seeking input from HA frontend community. |

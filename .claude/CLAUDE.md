@@ -12,18 +12,18 @@ sidebar panel built with Lit/HA web components. Distributed via HACS and GitHub.
 
 > **Update this section at the start of every working session.**
 
-Phase: **Design complete / ready for implementation**
-Working on: Foundational docs complete — `CLAUDE.md`, `DESIGN.md`, `SPEC.md`.
-Next: `manifest.json`, then `registry.py` skeleton, then `storage.py`.
+Phase: **v1 feature complete — pre-HACS / pre-public**
+Working on: Bug fixing, UI polish, disappearing panel investigation.
+Next: HACS prep (`hacs.json`, CI workflow), README, first tagged release, go public.
 
 ## Canonical Docs — Read These First
 
-| Doc | Purpose |
-|-----|---------|
-| `docs/DESIGN.md` | Goals, constraints, philosophy, non-goals |
-| `docs/SPEC.md` | Data model, service contracts, UI spec |
-| `docs/ARCHITECTURE.md` | Component map, file responsibilities, data flow |
-| `docs/wireframes/` | UI mockups — source of truth for panel implementation |
+| Doc                    | Purpose                                               |
+| ---------------------- | ----------------------------------------------------- |
+| `docs/DESIGN.md`       | Goals, constraints, philosophy, non-goals             |
+| `docs/SPEC.md`         | Data model, service contracts, UI spec                |
+| `docs/ARCHITECTURE.md` | Component map, file responsibilities, data flow       |
+| `docs/wireframes/`     | UI mockups — source of truth for panel implementation |
 
 When these docs conflict, `SPEC.md` wins for code decisions.
 When anything is ambiguous, ask before assuming — put the answer back in the docs.
@@ -54,24 +54,26 @@ When anything is ambiguous, ask before assuming — put the answer back in the d
 
 ## File Responsibilities
 
-| File | Responsibility |
-|------|---------------|
-| `__init__.py` | Integration setup, service registration, startup/shutdown |
-| `manifest.json` | HACS/HA metadata — name, version, domain |
-| `config_flow.py` | Minimal config entry (required by HA to load integration) |
-| `registry.py` | In-memory cache — two dicts, CRUD operations |
-| `storage.py` | JSON persistence via `homeassistant.helpers.storage.Store` |
-| `services.yaml` | Service definitions with Fields and Selectors |
-| `strings.json` | UI strings for config flow and panel |
-| `panel.js` | Lit web component — the custom sidebar panel |
+| File                                | Responsibility                                             |
+| ----------------------------------- | ---------------------------------------------------------- |
+| `__init__.py`                       | Integration setup, service registration, startup/shutdown  |
+| `manifest.json`                     | HACS/HA metadata — name, version, domain                   |
+| `config_flow.py`                    | Minimal config entry (required by HA to load integration)  |
+| `registry.py`                       | In-memory cache — two dicts, CRUD operations               |
+| `storage.py`                        | JSON persistence via `homeassistant.helpers.storage.Store` |
+| `services.yaml`                     | Service definitions with Fields and Selectors              |
+| `strings.json`                      | UI strings for config flow and panel                       |
+| `frontend/object-registry-panel.js` | Vanilla custom element — the custom sidebar panel          |
 
 ## Data Model (summary — full detail in SPEC.md)
 
 **Two in-memory dicts:**
+
 - Primary: `{ uuid: full_object_dict }` — source of truth
 - Lookup: `{ object_id: uuid }` — fast resolution for service calls
 
 **Object structure:**
+
 ```python
 {
     "uuid": "auto-generated, immutable",
@@ -93,11 +95,11 @@ When anything is ambiguous, ask before assuming — put the answer back in the d
 
 ## Service Interface (summary — full detail in SPEC.md)
 
-| Service | Input | Returns |
-|---------|-------|---------|
-| `object_registry.list_items` | none | List of metadata dicts (no data payload) |
-| `object_registry.get_item` | `object_id` or `uuid` | Single `data` payload dict |
-| `object_registry.get_object` | `object_id` or `uuid` | Full object (metadata + data) |
+| Service                      | Input                 | Returns                                  |
+| ---------------------------- | --------------------- | ---------------------------------------- |
+| `object_registry.list_items` | none                  | List of metadata dicts (no data payload) |
+| `object_registry.get_item`   | `object_id` or `uuid` | Single `data` payload dict               |
+| `object_registry.get_object` | `object_id` or `uuid` | Full object (metadata + data)            |
 
 ## CRUD Rules
 
