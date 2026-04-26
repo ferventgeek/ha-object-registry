@@ -31,7 +31,7 @@ custom_components/object_registry/
 ├── strings.json      ← UI strings for config flow
 │
 └── frontend/
-    └── object-registry-panel.js   ← Custom element (the sidebar panel)
+    └── object-registry-panel.js   ← Vanilla custom element (the sidebar panel)
 ```
 
 > NOTE: `frontend/` is a subdirectory of the integration folder. It is served
@@ -102,14 +102,17 @@ custom_components/object_registry/
 - Follows HA's standard strings format
 
 ### `frontend/object-registry-panel.js`
-- Single-file custom element (no build step required)
+- Single-file vanilla `HTMLElement` — no Lit dependency, no build step required
 - Registered as `object-registry-panel` via `customElements.define()`
 - Uses Shadow DOM for style isolation
-- Receives `hass` object from HA frontend (set as a property automatically)
-- Uses HA CSS custom properties for all colors and typography
-- Uses `ha-code-editor` for JSON editing, `ha-dialog` for confirmations
+- Receives `hass` object from HA frontend (set as property automatically)
+- Uses HA CSS custom properties for all colors, typography, and button styles
+- Uses `ha-code-editor` (CM6) for JSON editing — created programmatically
+  before DOM append to avoid Lit async init timing issues
+- Uses native `<dialog>` element for confirmation dialogs
 - Communicates with backend exclusively via `this._hass.callWS({type: ...})`
 - Subscribes to `object_registry_updated` events for concurrent edit detection
+- Handles `hass` reconnection — re-renders if DOM was blanked during disconnect
 
 ---
 
@@ -251,11 +254,15 @@ without bundling.
 
 ---
 
-## Files Not Yet Created
+## Pre-Publish Checklist
 
-| File | Notes |
-|------|-------|
-| `const.py` | Not in original stub list — add it |
-| `websocket.py` | Not in original stub list — add it |
-| `frontend/object-registry-panel.js` | Not in original stub list — add it |
-| `.github/workflows/validate.yml` | Intentionally deferred to pre-publish |
+| Item | Status | Notes |
+|------|--------|-------|
+| `const.py` | ✅ Complete | |
+| `websocket.py` | ✅ Complete | |
+| `frontend/object-registry-panel.js` | ✅ Complete | |
+| `hacs.json` | ⬜ Needed | Fill in before HACS submission |
+| `.github/workflows/validate.yml` | ⬜ Needed | hassfest + HACS validation CI |
+| `README.md` | ⬜ Needed | Installation, usage, examples |
+| `examples/basic_usage.yaml` | ⬜ Needed | Real ISY/Hue example automation |
+| First tagged release (`v0.1.0`) | ⬜ Needed | Required for HACS submission |

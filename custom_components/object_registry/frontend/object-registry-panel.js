@@ -60,6 +60,10 @@ class ObjectRegistryPanel extends HTMLElement {
     } else if (hass && this._objects.length === 0) {
       // hass reconnected after session timeout and we lost our data — reload
       this._load();
+    } else if (hass && !this.shadowRoot.querySelector('.panel')) {
+      // DOM was blanked during reconnection but data is intact — force re-render
+      // without reloading from backend. Fixes panel disappearing after tab switch.
+      this._render();
     }
   }
 
@@ -69,13 +73,15 @@ class ObjectRegistryPanel extends HTMLElement {
   }
 
   connectedCallback() {
-    // Subscribe to registry update events fired by the backend after every write
-    window.addEventListener("object_registry_updated", this._onRegistryUpdated);
     this._render();
   }
 
   disconnectedCallback() {
-    window.removeEventListener("object_registry_updated", this._onRegistryUpdated);
+    // Clean up WebSocket event subscription if active
+    if (this._unsubscribeEvents) {
+      this._unsubscribeEvents();
+      this._unsubscribeEvents = null;
+    }
   }
 
   // ------------------------------------------------------------------
@@ -87,14 +93,25 @@ class ObjectRegistryPanel extends HTMLElement {
       const result = await this._hass.callWS({ type: "object_registry/list" });
       this._objects = result || [];
       this._render();
+
+      // Subscribe to backend registry update events via HA WebSocket.
+      // This replaces window.addEventListener which cannot receive HA bus events.
+      // Called after every load to handle reconnection; guard prevents duplicates.
+      if (!this._unsubscribeEvents && this._hass.connection) {
+        this._unsubscribeEvents = await this._hass.connection.subscribeEvents(
+          (event) => this._onRegistryUpdated(event),
+          "object_registry_updated"
+        );
+      }
     } catch (err) {
       console.error("Object Registry: failed to load objects", err);
     }
   }
 
-  // Called when the backend fires an update event (another window saved a change)
+  // Called when the backend fires an object_registry_updated event.
+  // Receives HA bus event format: { event_type, data: { uuid, action } }
   _onRegistryUpdated(event) {
-    const { uuid, action } = event.detail || {};
+    const { uuid, action } = event.data || {};
 
     // If the object being edited was changed externally, show warning banner
     if (this._editingUuid && uuid === this._editingUuid && action !== "delete") {
@@ -363,6 +380,9 @@ class ObjectRegistryPanel extends HTMLElement {
             ` : ""}
             <button class="btn-secondary" id="btn-cancel">Cancel</button>
             <button class="btn-primary" id="btn-save" ${isDirty ? "" : "disabled"}>
+              <svg viewBox="0 0 24 24" width="16" height="16" style="fill:white;flex-shrink:0;">
+                <path d="M17 3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V7L17 3M19 19H5V5H16.17L19 7.83V19M12 12C10.34 12 9 13.34 9 15S10.34 18 12 18 15 16.66 15 15 13.66 12 12 12M6 6H15V10H6V6Z"/>
+              </svg>
               Save
             </button>
           </div>
@@ -381,7 +401,7 @@ class ObjectRegistryPanel extends HTMLElement {
           <h2>Delete ${obj ? _escape(obj.name) : "object"}?</h2>
           <p>This cannot be undone.</p>
           <div class="dialog-buttons">
-            <button class="btn-secondary" id="dialog-delete-cancel">Cancel</button>
+            <button class="btn-dialog-cancel" id="dialog-delete-cancel">Cancel</button>
             <button class="btn-danger" id="dialog-delete-confirm">Delete</button>
           </div>
         </div>
@@ -402,7 +422,7 @@ class ObjectRegistryPanel extends HTMLElement {
             reference the old object_id.
           </p>
           <div class="dialog-buttons">
-            <button class="btn-secondary" id="dialog-rename-cancel">Cancel</button>
+            <button class="btn-dialog-cancel" id="dialog-rename-cancel">Cancel</button>
             <button class="btn-primary" id="dialog-rename-confirm">
               Confirm rename and save
             </button>
@@ -419,7 +439,7 @@ class ObjectRegistryPanel extends HTMLElement {
           <h2>Unsaved changes</h2>
           <p id="discard-message"></p>
           <div class="dialog-buttons">
-            <button class="btn-secondary" id="dialog-discard-cancel">Keep editing</button>
+            <button class="btn-dialog-cancel" id="dialog-discard-cancel">Keep editing</button>
             <button class="btn-primary" id="dialog-discard-confirm">
               Discard and open
             </button>
@@ -552,11 +572,12 @@ class ObjectRegistryPanel extends HTMLElement {
     this._closeEditor();
   }
 
-  _handleRestore() {
-    this._form = { ...this._originalForm };
+  async _handleRestore() {
+    // Fetch fresh data from backend — gives user the actual current saved state,
+    // not just the local snapshot from when the editor was opened.
     this._errorMessage = null;
     this._warnMessage = null;
-    this._render();
+    await this._openEditor(this._editingUuid);
   }
 
   async _handleSave() {
@@ -839,7 +860,7 @@ function _styles() {
       flex: 0 0 33%;
       overflow-y: auto;
       padding: 0 24px;
-      border-bottom: 1px solid var(--divider-color);
+      border-bottom: 1px solid var(--disabled-text-color);
     }
 
     .split-bottom {
@@ -902,7 +923,7 @@ function _styles() {
       width: 28px;
       height: 28px;
       color: var(--secondary-text-color);
-      opacity: 0.6;
+      opacity: 0.7;
     }
 
     .obj-icon svg {
@@ -1058,6 +1079,11 @@ function _styles() {
       flex: 1;
     }
 
+    #field-object-id {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.95em;
+    }
+
     /* ---- Banners ---- */
 
     .banner {
@@ -1077,7 +1103,7 @@ function _styles() {
     }
 
     .banner-warn {
-      background: rgba(var(--rgb-warning-color, 255,152,0), 0.1);
+      background: rgba(var(--rgb-warning-color, 255,152,0), 0.0);
       color: var(--warning-color, #ff9800);
       border: 1px solid var(--warning-color, #ff9800);
     }
@@ -1125,15 +1151,22 @@ function _styles() {
       gap: 8px;
     }
 
+    /* Save — solid teal pill with floppy icon */
     .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       padding: 8px 20px;
       border: none;
-      border-radius: 4px;
+      border-radius: 24px;
       background: var(--primary-color);
       color: white;
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
+      line-height: 1.4;
+      transition: opacity 0.15s;
     }
 
     .btn-primary:disabled {
@@ -1141,53 +1174,89 @@ function _styles() {
       cursor: default;
     }
 
+    /* Cancel in dialogs — outlined pill */
     .btn-secondary {
       padding: 8px 20px;
-      border: 1px solid var(--primary-color);
-      border-radius: 4px;
+      border: 2px solid var(--primary-color);
+      border-radius: 24px;
       background: transparent;
       color: var(--primary-color);
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
+      transition: background 0.15s;
     }
 
+    .btn-secondary:hover {
+      background: rgba(var(--rgb-primary-color, 3,169,244), 0.1);
+    }
+
+    /* Restore — text only, blue pill on hover */
     .btn-text {
-      padding: 8px 12px;
+      padding: 8px 16px;
       border: none;
+      border-radius: 24px;
       background: transparent;
-      color: var(--secondary-text-color);
+      color: var(--primary-color);
       font-size: 14px;
+      font-weight: 500;
       cursor: pointer;
+      transition: background 0.15s;
     }
 
     .btn-text:hover {
-      color: var(--primary-text-color);
+      background: rgba(var(--rgb-primary-color, 3,169,244), 0.1);
     }
 
+    /* Delete object — text only, red pill on hover */
     .btn-delete {
-      padding: 8px 12px;
+      padding: 8px 16px;
       border: none;
+      border-radius: 24px;
       background: transparent;
       color: var(--error-color, #f44336);
       font-size: 14px;
+      font-weight: 500;
       cursor: pointer;
-      opacity: 0.7;
+      transition: background 0.15s;
     }
 
     .btn-delete:hover {
-      opacity: 1;
+      background: rgba(var(--rgb-error-color, 244,67,54), 0.1);
     }
 
+    /* Delete in dialog — solid red pill */
     .btn-danger {
       padding: 8px 20px;
       border: none;
-      border-radius: 4px;
+      border-radius: 24px;
       background: var(--error-color, #f44336);
       color: white;
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn-danger:hover {
+      opacity: 0.9;
+    }
+
+    /* Dialog cancel — text only, blue pill on hover */
+    .btn-dialog-cancel {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 24px;
+      background: transparent;
+      color: var(--primary-color);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-dialog-cancel:hover {
+      background: rgba(var(--rgb-primary-color, 3,169,244), 0.15);
     }
 
     /* ---- FAB ---- */
@@ -1257,3 +1326,4 @@ function _styles() {
 }
 
 customElements.define("object-registry-panel", ObjectRegistryPanel);
+

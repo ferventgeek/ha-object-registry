@@ -116,18 +116,21 @@ the Restore and Delete controls.
   confirmation dialog before switching
 
 **Native HA components used:**
-- `ha-code-editor` — JSON payload editor (CodeMirror wrapper, themed, line numbers)
-- `ha-dialog` — confirmation dialogs
+- `ha-code-editor` — JSON payload editor (CodeMirror 6, themed, line numbers, fullscreen)
+  Created programmatically before DOM append to avoid Lit async timing issues.
+  CM6 sized via Shadow DOM style injection (see ARCHITECTURE.md Known Quirks).
+- Native `<dialog>` element for confirmation dialogs (not `ha-dialog`)
 - HA design tokens (`--primary-color`, `--card-background-color`,
   `--secondary-background-color`, `--primary-text-color`, `--error-color`,
-  `--warning-color`, `--divider-color`)
-- Secondary/accent theme color for expanded row background (not hardcoded blue)
+  `--warning-color`, `--divider-color`, `--disabled-text-color`)
+- Button styles match HA Lollipop pill conventions (rounded, hover states)
 
 ## GUI Strategy
 
-**Phase 1 (current):** Custom sidebar panel — full management UI as described
+**Phase 1 (complete):** Custom sidebar panel — full management UI as described
 above. Config flow is minimal (required by HA to load the integration) but the
-panel is the primary user interface.
+panel is the primary user interface. Built as a vanilla `HTMLElement` (no Lit
+dependency) for simplicity and no build step requirement.
 
 **Phase 2 (future):** JSON editor resize handle — drag to resize the editor
 height within the split panel. Noted here to manage GitHub requests; not in

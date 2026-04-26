@@ -214,7 +214,7 @@ def _validate_name_unique(
     for uid, obj in objects.items():
         if uid == exclude_uuid:
             continue
-        if obj["name"] == name:
+        if obj["name"].lower() == name.lower():
             raise ValueError(f"name '{name}' is already in use")
 
 
