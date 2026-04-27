@@ -15,7 +15,7 @@
 ## What It Does
 
 Home Assistant has transformed what I can do with automation in my complex
-environment with lost of legacy automation tech. But what I could not find was an easy way to create and manage
+environment with a lot of legacy automation tech. But what I could not find was an easy way to create and manage
 configuration-style structured data. Think mapping tables, lookup references, and device relationships,
 without working directly with the file system or embedding it
 in automation YAML. (Example below) I was specifically looking for something
