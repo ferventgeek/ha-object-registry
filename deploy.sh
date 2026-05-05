@@ -77,7 +77,8 @@ if ${DO_DELETE} && ${DO_RESTART}; then
 fi
 
 LOCAL_SRC="./custom_components/object_registry"
-REMOTE_DEST="${PI_HOST}:${HA_DEST}/object_registry"
+REMOTE_HOST="${PI_HOST}"
+REMOTE_PATH="${HA_DEST}/object_registry"
 
 echo "==> Object Registry deploy"
 echo ""
@@ -96,13 +97,13 @@ if ${DO_DELETE}; then
       echo "Aborted."
       exit 0
     fi
-    echo "[1/1] Deleting ${HA_DEST}/object_registry/ on HAOS..."
-    ssh "${PI_HOST}" "rm -rf ${HA_DEST}/object_registry/"
+    echo "[1/1] Deleting ${REMOTE_PATH}/ on HAOS..."
+    ssh "${REMOTE_HOST}" "rm -rf ${REMOTE_PATH}/"
     echo "      Done."
   else
     echo "WARNING: This will delete the following files from HAOS:"
     for f in "${FILES[@]}"; do
-      echo "         ${HA_DEST}/object_registry/${f}"
+      echo "         ${REMOTE_PATH}/${f}"
     done
     echo ""
     read -r -p "Type YES to confirm: " CONFIRM
@@ -112,7 +113,7 @@ if ${DO_DELETE}; then
     fi
     echo "[1/1] Deleting specified files on HAOS..."
     for f in "${FILES[@]}"; do
-      ssh "${PI_HOST}" "rm -f ${HA_DEST}/object_registry/${f}"
+      ssh "${REMOTE_HOST}" "rm -f ${REMOTE_PATH}/${f}"
       echo "      Deleted: ${f}"
     done
     echo "      Done."
@@ -130,16 +131,16 @@ fi
 if [[ ${#FILES[@]} -eq 0 ]]; then
   # Copy entire integration folder
   echo "[1/2] Copying all files to HAOS..."
-  scp -r "${LOCAL_SRC}/." "${REMOTE_DEST}/"
+  scp -r "${LOCAL_SRC}/." "${REMOTE_HOST}:${REMOTE_PATH}/"
   echo "      Done."
 else
   # Copy specific files only
   echo "[1/2] Copying ${#FILES[@]} file(s) to HAOS..."
   for f in "${FILES[@]}"; do
     # Preserve subdirectory structure (e.g. frontend/object-registry-panel.js)
-    REMOTE_DIR="${REMOTE_DEST}/$(dirname "${f}")"
-    ssh "${PI_HOST}" "mkdir -p ${REMOTE_DIR}"
-    scp "${LOCAL_SRC}/${f}" "${PI_HOST}:${REMOTE_DEST}/${f}"
+    REMOTE_DIR="${REMOTE_PATH}/$(dirname "${f}")"
+    ssh "${REMOTE_HOST}" "mkdir -p ${REMOTE_DIR}"
+    scp "${LOCAL_SRC}/${f}" "${REMOTE_HOST}:${REMOTE_PATH}/${f}"
     echo "      Copied: ${f}"
   done
   echo "      Done."
@@ -161,7 +162,7 @@ if ${DO_RESTART}; then
 
   if [[ "${HTTP_STATUS}" == "200" || "${HTTP_STATUS}" == "201" ]]; then
     echo "      Restart triggered. HA will reload in a moment."
-    echo "      Watch logs: ssh ${PI_HOST} 'journalctl -f'"
+    echo "      Watch logs: ssh ${REMOTE_HOST} 'journalctl -f'"
   else
     echo "      WARNING: Unexpected HTTP status ${HTTP_STATUS}."
     echo "      Check HA_TOKEN and HA_IP in deploy.env."
