@@ -72,8 +72,11 @@ class ObjectRegistryPanel extends HTMLElement {
       return;
     }
 
-    // hass updated normally — re-render with current data
-    this._render();
+    // hass updated (HA state heartbeat) — store the new hass object so
+    // subsequent callWS() calls use a fresh connection, but do NOT re-render.
+    // List view stays current via object_registry_updated event subscription.
+    // Editor must never be re-rendered here — it would destroy focus and
+    // wipe unsaved input on every HA entity state change in the system.
   }
 
   // HA sets this with panel config
@@ -121,6 +124,13 @@ class ObjectRegistryPanel extends HTMLElement {
     try {
       const result = await this._hass.callWS({ type: "object_registry/list" });
       this._objects = result || [];
+
+      // Do not re-render while the editor is open — that would wipe the editor
+      // DOM, destroy focus, and discard unsaved input. The list behind the
+      // editor will be current when the user closes it and _render() runs then.
+      const isEditing = this._editingUuid !== null || this._isAdding;
+      if (isEditing) return;
+
       this._render();
 
       // Subscribe to backend registry update events via HA WebSocket.
@@ -155,17 +165,57 @@ class ObjectRegistryPanel extends HTMLElement {
   // Receives HA bus event format: { event_type, data: { uuid, action } }
   _onRegistryUpdated(event) {
     const { uuid, action } = event.data || {};
+    const isEditing = this._editingUuid !== null || this._isAdding;
 
-    // If the object being edited was changed externally, show warning banner
-    if (this._editingUuid && uuid === this._editingUuid && action !== "delete") {
-      this._warnMessage =
-        "This object was modified in another window. Saving will overwrite " +
-        "those changes. Use Restore to load the current version.";
-      this._render();
+    if (isEditing) {
+      // If the object being edited was changed externally, show warning banner
+      // in-place — targeted DOM patch only, no full re-render that would
+      // destroy focus or wipe unsaved input.
+      if (this._editingUuid && uuid === this._editingUuid && action !== "delete") {
+        this._warnMessage =
+          "This object was modified in another window. Saving will overwrite " +
+          "those changes. Use Restore to load the current version.";
+        this._updateBanner();
+      }
+      // Silently refresh this._objects so the list is current when editor closes.
+      // _load() will skip _render() because isEditing is true (guard in _load).
+      this._load();
+      return;
     }
 
-    // Reload the list in the background to keep it current
+    // Not editing — reload and re-render the list normally.
     this._load();
+  }
+
+  // Update the error/warning banners in-place without re-rendering the editor.
+  // Finds the existing ha-alert elements in the shadow DOM and updates them
+  // directly, preserving focus and unsaved input in all other fields.
+  _updateBanner() {
+    const root = this.shadowRoot;
+    if (!root) return;
+
+    // Remove any existing banners
+    root.querySelectorAll(".banner").forEach(el => el.remove());
+
+    // Insert new banners before the code editor wrapper
+    const mount = root.getElementById("code-editor-mount");
+    if (!mount) return;
+
+    if (this._errorMessage) {
+      const alert = document.createElement("ha-alert");
+      alert.setAttribute("alert-type", "error");
+      alert.className = "banner";
+      alert.textContent = this._errorMessage;
+      mount.before(alert);
+    }
+
+    if (this._warnMessage) {
+      const alert = document.createElement("ha-alert");
+      alert.setAttribute("alert-type", "warning");
+      alert.className = "banner";
+      alert.textContent = this._warnMessage;
+      mount.before(alert);
+    }
   }
 
   // ------------------------------------------------------------------
