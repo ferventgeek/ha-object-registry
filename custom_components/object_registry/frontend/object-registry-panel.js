@@ -86,21 +86,6 @@ class ObjectRegistryPanel extends HTMLElement {
 
   connectedCallback() {
     this._render();
-    // WORKAROUND: HA's partial-panel-resolver removes our element from
-    // ha-panel-custom after Chrome throttles background tabs (~5 min).
-    // HA's router then thinks it's already on this panel and won't remount.
-    // Fix: on every tab return, force a navigate-away-and-back so HA
-    // remounts the element cleanly. Cost is one WebSocket reload per tab
-    // return — acceptable. Unsaved editor state is lost, which is fine
-    // since HA already destroyed the element.
-    this._visibilityHandler = () => {
-      if (document.visibilityState !== "visible") return;
-      const current = window.location.pathname;
-      window.history.pushState(null, "", "/");
-      window.history.pushState(null, "", current);
-      window.dispatchEvent(new PopStateEvent("popstate"));
-    };
-    document.addEventListener("visibilitychange", this._visibilityHandler);
   }
 
   disconnectedCallback() {
@@ -108,11 +93,6 @@ class ObjectRegistryPanel extends HTMLElement {
     if (this._unsubscribeEvents) {
       this._unsubscribeEvents();
       this._unsubscribeEvents = null;
-    }
-    // Clean up visibility listener
-    if (this._visibilityHandler) {
-      document.removeEventListener("visibilitychange", this._visibilityHandler);
-      this._visibilityHandler = null;
     }
   }
 
@@ -1392,6 +1372,50 @@ function _styles() {
       gap: 8px;
     }
   `;
+}
+
+// ------------------------------------------------------------------
+// Module-scope visibility handler for disappearing panel workaround.
+//
+// Problem: After ~5 min in a background tab, Chrome throttles JS and
+// HA's partial-panel-resolver removes <object-registry-panel> from the
+// DOM entirely. When the tab returns, HA's router thinks it's already
+// on this panel route and won't remount. Panel stays blank.
+//
+// Why module scope: A listener attached in connectedCallback dies when
+// the element is removed. This listener lives outside the class so it
+// survives element removal and persists for the page lifetime.
+//
+// Fix: On tab return, if we're on the panel route, dispatch HA's own
+// location-changed event (not popstate — HA's Lit router ignores that)
+// to navigate away and back, forcing a clean remount. Cost is one
+// WebSocket reload per tab return. Any unsaved editor state is already
+// lost since HA destroyed the element during throttling.
+//
+// Guard prevents double-registration across hot reloads.
+// ------------------------------------------------------------------
+
+if (!window._objectRegistryVisibilityHandler) {
+  window._objectRegistryVisibilityHandler = () => {
+    if (document.visibilityState !== "visible") return;
+    if (window.location.pathname !== "/object_registry") return;
+
+    // Navigate away then back using HA's router event.
+    // Two dispatches are required: the first moves the router off this
+    // route, the second brings it back — triggering a full remount.
+    window.history.pushState(null, "", "/");
+    window.dispatchEvent(
+      new CustomEvent("location-changed", { bubbles: true })
+    );
+    window.history.pushState(null, "", "/object_registry");
+    window.dispatchEvent(
+      new CustomEvent("location-changed", { bubbles: true })
+    );
+  };
+  document.addEventListener(
+    "visibilitychange",
+    window._objectRegistryVisibilityHandler
+  );
 }
 
 if (!customElements.get("object-registry-panel")) {
