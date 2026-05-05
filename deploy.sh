@@ -4,11 +4,16 @@
 # Deploys the object_registry integration to Home Assistant OS on the Pi.
 #
 # Usage:
-#   ./deploy.sh           — push code only, no restart
-#   ./deploy.sh restart   — push code + restart HA via API
+#   ./deploy.sh                              — copy all files
+#   ./deploy.sh --restart                    — copy all files + restart HA
+#   ./deploy.sh --files a.py b.js            — copy specific files only
+#   ./deploy.sh --restart --files a.py b.js  — copy specific files + restart HA
+#   ./deploy.sh --delete                     — delete entire /object_registry folder
+#   ./deploy.sh --delete --files a.py b.js   — delete specific files only
 #
+# Flags must come before file list.
+# --delete always requires a manual HA restart (not done automatically).
 # Configuration is read from deploy.env in the repo root.
-# deploy.env is gitignored and will never be committed.
 
 set -euo pipefail
 
@@ -19,15 +24,13 @@ set -euo pipefail
 ENV_FILE="$(dirname "$0")/deploy.env"
 
 if [ ! -f "${ENV_FILE}" ]; then
-  echo "ERROR: deploy.env file not found."
+  echo "ERROR: deploy.env not found."
   echo "       Copy deploy.env.example to deploy.env and fill in your values."
   exit 1
 fi
 
-# shellcheck source=deploy.env
 source "${ENV_FILE}"
 
-# Verify required variables are set
 : "${PI_HOST:?PI_HOST not set in deploy.env}"
 : "${HA_DEST:?HA_DEST not set in deploy.env}"
 : "${HA_IP:?HA_IP not set in deploy.env}"
@@ -35,41 +38,121 @@ source "${ENV_FILE}"
 : "${HA_TOKEN:?HA_TOKEN not set in deploy.env}"
 
 # ------------------------------------------------------------------
-# Parse argument
+# Parse flags and file list
 # ------------------------------------------------------------------
 
-RESTART_MODE="${1:-none}"  # none | restart
+DO_RESTART=false
+DO_DELETE=false
+FILES=()
 
-if [[ "${RESTART_MODE}" != "none" && "${RESTART_MODE}" != "restart" ]]; then
-  echo "Usage: ./deploy.sh [restart]"
-  echo "  (no argument)  push code only"
-  echo "  restart        push code + restart HA via API"
-  exit 1
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --restart)
+      DO_RESTART=true
+      shift
+      ;;
+    --delete)
+      DO_DELETE=true
+      shift
+      ;;
+    --files)
+      shift
+      # Everything remaining is the file list
+      FILES=("$@")
+      break
+      ;;
+    *)
+      echo "ERROR: Unknown argument: $1"
+      echo "Usage: ./deploy.sh [--restart] [--delete] [--files file1 file2 ...]"
+      exit 1
+      ;;
+  esac
+done
+
+# --delete and --restart together — warn and ignore --restart
+if ${DO_DELETE} && ${DO_RESTART}; then
+  echo "WARNING: --restart is ignored with --delete."
+  echo "         Manual HA restart required after delete operations."
+  DO_RESTART=false
 fi
 
 LOCAL_SRC="./custom_components/object_registry"
+REMOTE_DEST="${PI_HOST}:${HA_DEST}/object_registry"
 
-echo "==> Deploying object_registry to Home Assistant"
-echo "    Restart mode: ${RESTART_MODE}"
+echo "==> Object Registry deploy"
 echo ""
 
 # ------------------------------------------------------------------
-# Step 1: rsync directly to HAOS over SSH
+# DELETE mode
 # ------------------------------------------------------------------
 
-echo "[1/2] Syncing files to HAOS..."
-rsync -av --delete --checksum \
-  "${LOCAL_SRC}/" \
-  "${PI_HOST}:${HA_DEST}/object_registry/"
-echo "      Done."
+if ${DO_DELETE}; then
+  if [[ ${#FILES[@]} -eq 0 ]]; then
+    echo "WARNING: This will delete the entire /object_registry folder on HAOS."
+    echo "         Manual HA restart will be required afterwards."
+    echo ""
+    read -r -p "Type YES to confirm: " CONFIRM
+    if [[ "${CONFIRM}" != "YES" ]]; then
+      echo "Aborted."
+      exit 0
+    fi
+    echo "[1/1] Deleting ${HA_DEST}/object_registry/ on HAOS..."
+    ssh "${PI_HOST}" "rm -rf ${HA_DEST}/object_registry/"
+    echo "      Done."
+  else
+    echo "WARNING: This will delete the following files from HAOS:"
+    for f in "${FILES[@]}"; do
+      echo "         ${HA_DEST}/object_registry/${f}"
+    done
+    echo ""
+    read -r -p "Type YES to confirm: " CONFIRM
+    if [[ "${CONFIRM}" != "YES" ]]; then
+      echo "Aborted."
+      exit 0
+    fi
+    echo "[1/1] Deleting specified files on HAOS..."
+    for f in "${FILES[@]}"; do
+      ssh "${PI_HOST}" "rm -f ${HA_DEST}/object_registry/${f}"
+      echo "      Deleted: ${f}"
+    done
+    echo "      Done."
+  fi
+  echo ""
+  echo "==> Delete complete. Manual HA restart required."
+  echo "    Restart via: ./deploy.sh --restart"
+  exit 0
+fi
+
+# ------------------------------------------------------------------
+# COPY mode
+# ------------------------------------------------------------------
+
+if [[ ${#FILES[@]} -eq 0 ]]; then
+  # Copy entire integration folder
+  echo "[1/2] Copying all files to HAOS..."
+  scp -r "${LOCAL_SRC}/." "${REMOTE_DEST}/"
+  echo "      Done."
+else
+  # Copy specific files only
+  echo "[1/2] Copying ${#FILES[@]} file(s) to HAOS..."
+  for f in "${FILES[@]}"; do
+    # Preserve subdirectory structure (e.g. frontend/object-registry-panel.js)
+    REMOTE_DIR="${REMOTE_DEST}/$(dirname "${f}")"
+    ssh "${PI_HOST}" "mkdir -p ${REMOTE_DIR}"
+    scp "${LOCAL_SRC}/${f}" "${PI_HOST}:${REMOTE_DEST}/${f}"
+    echo "      Copied: ${f}"
+  done
+  echo "      Done."
+fi
+
 echo ""
 
 # ------------------------------------------------------------------
-# Step 2: Restart (optional)
+# Restart (optional)
 # ------------------------------------------------------------------
 
-if [[ "${RESTART_MODE}" == "restart" ]]; then
-  echo "[2/2] Sending restart to Home Assistant..."
+if ${DO_RESTART}; then
+  echo "[2/2] Restarting Home Assistant..."
   HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
     -X POST \
     "http://${HA_IP}:${HA_PORT}/api/services/homeassistant/restart" \
@@ -81,15 +164,13 @@ if [[ "${RESTART_MODE}" == "restart" ]]; then
     echo "      Watch logs: ssh ${PI_HOST} 'journalctl -f'"
   else
     echo "      WARNING: Unexpected HTTP status ${HTTP_STATUS}."
-    echo "      Check your HA_TOKEN and HA_IP in deploy.env."
+    echo "      Check HA_TOKEN and HA_IP in deploy.env."
   fi
-  echo ""
-
 else
   echo "[2/2] Skipping restart."
-  echo "      For JS-only changes: hard refresh browser (Cmd+Shift+R)."
-  echo "      For Python changes:  run ./deploy.sh restart"
-  echo ""
+  echo "      JS-only changes: hard refresh browser (Cmd+Shift+R)."
+  echo "      Python changes:  run ./deploy.sh --restart"
 fi
 
+echo ""
 echo "==> Deploy complete."

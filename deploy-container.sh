@@ -17,7 +17,7 @@ set -euo pipefail
 # Load config from .env
 # ------------------------------------------------------------------
 
-ENV_FILE="$(dirname "$0")/deploy.env"
+ENV_FILE="$(dirname "$0")/deploy-container.env"
 
 if [ ! -f "${ENV_FILE}" ]; then
   echo "ERROR: .env file not found."

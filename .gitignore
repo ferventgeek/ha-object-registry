@@ -176,4 +176,4 @@ __marimo__/
 .vscode/settings.json
 
 # Script .env's
-deploy.env
+deploy*.env
