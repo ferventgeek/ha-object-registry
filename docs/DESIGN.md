@@ -2,11 +2,11 @@
 
 ## Problem Statement
 
-Home Assistant is a powerful automation platform, but it has a meaningful gap:
-there is no native way to define reusable, structured mapping data that
+Home Assistant is a powerful automation platform, but I felt there was a small gap for my workflow:
+native reusable, structured mapping data that
 automations and scripts can look up at runtime. The typical workaround is to
-hardcode edge cases directly in automation YAML, which quickly becomes
-unmaintainable as the number of devices and relationships grows.
+hardcode edge cases directly in automation YAML, which at scale (or in time) can become
+hard to maintain as the number of devices and relationships grows.
 
 A concrete example: a home using an ISY/Eisy controller for legacy Insteon and
 Z-Wave devices alongside newer HA-native devices. Connecting ISY device events
@@ -25,8 +25,9 @@ A Home Assistant custom integration that provides:
 
 - An **in-memory registry** of named JSON objects, accessible from automations
   and scripts via HA service calls
-- A **custom sidebar panel** built with Lit/HA web components for creating and
-  editing objects without touching YAML or config files
+- A **custom sidebar panel** built as a vanilla `HTMLElement` — no Lit
+  dependency, no build step — for creating and editing objects without touching
+  YAML or config files
 - **Persistent storage** via HA's native `homeassistant.helpers.storage.Store`
   interface (JSON on disk, loaded into memory at startup)
 - **HACS distribution** for easy community installation
@@ -48,8 +49,8 @@ A Home Assistant custom integration that provides:
 
 Every file should be understandable by a capable weekend coder who knows Python
 basics but is not an expert. If a pattern requires explanation, replace it with
-something simpler or document it with a plain-English comment. This is a
-showcase of clear, well-organized code — not advanced Python technique.
+something simpler or document it with a plain-language comment. This should be
+clear, well-organized code, advanced Python or JavaScript technique.
 
 ### Minimal support surface
 
@@ -57,9 +58,10 @@ The service interface is intentionally narrow: `list_items`, `get_item`,
 `get_object`. We do not expose internal implementation details, provide helper
 methods for processing returned data, or accept automation logic as input.
 
-This boundary is critical: when a user files a GitHub issue, the problem should
-be clearly attributable to the integration or to their automation — never
-ambiguous. A narrow interface makes that obvious.
+This boundary is critical: when a user files a GitHub issue, I want to help users
+delineate where an issue might lie at the outset. Is HA-specific or from the Object Registry specifically?
+Ambiguity of that demarcation can frustrate users and a narrow interface makes that line more obvious.
+I'm not an HA expert by any means and if there's an implementation issue which can be solved
 
 ### One file, one job
 
@@ -70,9 +72,10 @@ handles the HA config entry requirement. Nothing crosses those boundaries.
 ### HA conventions everywhere
 
 We follow HA's own patterns for every interface: async setup, config entries,
-the Store interface, service registration, Lit web components, HA design tokens,
-and `ha-code-editor` for JSON editing. A developer familiar with HA internals
-should feel at home immediately.
+the Store interface, service registration, HA design tokens, native HA
+widgets (`ha-code-editor`, `ha-alert`), and vanilla custom elements that
+feel at home alongside HA's Lit-based frontend. A developer familiar with
+HA internals should feel at home immediately.
 
 ### Validate on submit, never on keystroke
 
@@ -84,8 +87,8 @@ format and uniqueness are enforced at submit time.
 ## GUI Design
 
 The management UI is a **custom sidebar panel** using HA's Lollipop frontend
-conventions (Lit web components, HA design tokens, native HA widgets wherever
-possible). It has two views:
+conventions (HA design tokens, native HA widgets wherever possible). Built as
+a vanilla `HTMLElement` — no Lit dependency, no build step. It has two views:
 
 **List view:** A sortable table of all objects showing name, description,
 object_id, last updated (human-friendly), and type. Rows are accordion-style —
@@ -94,6 +97,7 @@ button is in the bottom right corner.
 
 **Edit/Add view:** The panel splits into top ~1/3 (scrollable list of all other
 objects) and bottom ~2/3 (the editor anchored to the bottom). The editor shows:
+
 - Metadata fields: `name*`, `object_id*` (side by side), `description` (full width)
 - Read-only display: `Created` and `Updated` timestamps (local timezone)
 - Optional banner: error (pink) or concurrent-edit warning (amber)
@@ -105,17 +109,22 @@ Add and Edit use the same view. Add mode shows placeholder defaults and omits
 the Restore and Delete controls.
 
 **Key interaction rules:**
+
 - Save is disabled until any field differs from its opened state
 - All validation (uniqueness, snake_case format, valid JSON) fires on Save only
 - Changing `object_id` on Save triggers a confirmation dialog warning it may
   break existing Automations or Scripts
 - Delete triggers a confirmation dialog: "Delete [name]? This cannot be undone."
-- Concurrent edit detected via WebSocket: amber warning banner appears,
-  fields are NOT updated automatically, Restore fetches current cache state
+- Concurrent edit detected via WebSocket: amber warning banner appears in-place
+  without re-rendering the editor — fields are NOT updated automatically,
+  Restore fetches current cache state
 - Clicking another object while editing with unsaved changes triggers a
   confirmation dialog before switching
+- HA fires `set hass` on every entity state change system-wide — the editor
+  never re-renders in response to this, preserving focus and unsaved input
 
 **Native HA components used:**
+
 - `ha-code-editor` — JSON payload editor (CodeMirror 6, themed, line numbers, fullscreen)
   Created programmatically before DOM append to avoid Lit async timing issues.
   CM6 sized via Shadow DOM style injection (see ARCHITECTURE.md Known Quirks).

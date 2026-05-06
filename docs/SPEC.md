@@ -332,8 +332,7 @@ Default sort: last updated, most recent first.
 The chevron icon on the right is a visual affordance only.
 
 **Add item:** FAB button (`+ Add item`) fixed to bottom-right corner.
-Clicking adds a new blank row at the bottom of the list and scrolls it into
-view, then activates edit view.
+Clicking opens the split editor view with blank fields ready for input.
 
 **Empty state:** When no objects exist, show a centered message:
 "No objects yet. Click '+ Add item' to create one."
@@ -386,11 +385,12 @@ end of the Last update column. Goes multi-line if needed.
 
 - Shown when Save validation fails
 - Includes warning icon + message text
-- Message includes line number if available from `ha-code-editor`
-- Blocks save (Save button disabled while error is visible)
+- Message text comes from the backend (`ValueError` raised in `registry.py`)
+  or from the panel's own pre-submit checks (empty required fields, invalid JSON)
+- Blocks save (Save button re-enabled only after user edits a field)
 - Example: `id 'blue_object' is already in use`
 - Example: `object_id must use only lowercase letters, numbers, and underscores`
-- Example: `Invalid JSON at line 4`
+- Example: `Name and Object ID are required.`
 
 **Warning banner (amber, `--warning-color`):**
 
@@ -428,7 +428,9 @@ Full-width row pinned to the bottom of the editor area. Not a floater.
 
 ### 5.5 Confirmation Dialogs
 
-All confirmations use native `ha-dialog`.
+All confirmations use the native HTML `<dialog>` element styled to match HA's
+card aesthetic. (`ha-dialog` was not used — it introduces Lit async complexity
+with no benefit for our use case.)
 
 **On Save with object_id change:**
 
@@ -503,8 +505,8 @@ get_object:
 
 ---
 
-## 7. Open Questions
+## 7. Resolved Questions
 
-| #   | Question                                                                                                              | Resolution                                                                                                                                                                                                                                                                                                    |
-| --- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Custom panel lifecycle — how does `partial-panel-resolver` manage `ha-panel-custom` during background tab throttling? | **Unresolved.** After ~5 min, Chrome throttles JS and HA removes `<object-registry-panel>` from `<ha-panel-custom>` entirely. On tab return the router sees the panel as already active and doesn't remount. Navigation workaround in place but not fully reliable. Seeking input from HA frontend community. |
+| #   | Question                                                                                                              | Resolution                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Custom panel lifecycle — how does `partial-panel-resolver` manage `ha-panel-custom` during background tab throttling? | **Resolved.** (Hopefully.) After ~5 min, Chrome throttles JS and HA removes `<object-registry-panel>` from `<ha-panel-custom>` entirely. Fixed by registering a `visibilitychange` listener at module scope (outside the class) so it survives element removal. On tab return, dispatches HA's `location-changed` event with a 100ms `setTimeout` between navigate-away and navigate-back, giving the Lit router time to process each event separately and remount the panel cleanly. See ARCHITECTURE.md Known Quirks. |

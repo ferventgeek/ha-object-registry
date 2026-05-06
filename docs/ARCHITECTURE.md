@@ -6,8 +6,9 @@ The integration has two distinct layers:
 
 - **Backend (Python):** Runs inside HA. Manages the in-memory cache, persists
   data via Store, and exposes service calls for automations and scripts.
-- **Frontend (JavaScript):** A Lit-style custom element served as a static file.
-  Renders the sidebar panel and communicates with the backend via WebSocket.
+- **Frontend (JavaScript):** A vanilla `HTMLElement` custom element served as a
+  static file. No Lit dependency, no build step. Renders the sidebar panel and
+  communicates with the backend via WebSocket.
 
 These two layers are intentionally decoupled. The backend knows nothing about
 the panel. The panel knows nothing about the Store. They communicate only via
@@ -42,6 +43,7 @@ custom_components/object_registry/
 ## Component Responsibilities
 
 ### `__init__.py`
+
 - Calls `async_setup_entry()` — the HA entry point for config-entry-based integrations
 - Instantiates `ObjectRegistry` (from `registry.py`) and stores it on `hass.data`
 - Loads persisted data via `storage.py` on startup
@@ -51,16 +53,19 @@ custom_components/object_registry/
 - Calls `async_unload_entry()` on shutdown — cleans up services and panel
 
 ### `manifest.json`
+
 - Declares domain, name, version, and dependencies
 - Required dependencies: `["http", "frontend", "panel_custom"]`
 - No external pip requirements (`requirements: []`)
 
 ### `config_flow.py`
+
 - Implements the minimum required config flow so HA will load the integration
 - Single step: no user input required, just creates the config entry
 - Does not expose options flow in v1
 
 ### `const.py`
+
 - `DOMAIN = "object_registry"`
 - `STORAGE_KEY = "object_registry"`
 - `STORAGE_VERSION = 1`
@@ -69,14 +74,16 @@ custom_components/object_registry/
 - WebSocket command type strings
 
 ### `registry.py`
+
 - Owns the two in-memory dicts: `_objects` (primary) and `_index` (lookup)
-- Exposes methods: `get_all()`, `get_by_id()`, `get_by_uuid()`,
-  `create()`, `update()`, `delete()`
+- Exposes methods: `get_all_metadata()`, `get_by_object_id()`, `get_by_uuid()`,
+  `async_create()`, `async_update()`, `async_delete()`
 - All methods validate inputs before mutating state
 - Calls `storage.py` flush after every successful write
 - Raises `ValueError` with descriptive messages on validation failure
 
 ### `storage.py`
+
 - Wraps `homeassistant.helpers.storage.Store`
 - Exposes two methods: `async_load()` and `async_save(data)`
 - `async_load()` returns the stored object list or `None` on first run
@@ -84,41 +91,50 @@ custom_components/object_registry/
 - Store is initialized with `STORAGE_VERSION = 1` and `STORAGE_KEY`
 
 ### `websocket.py`
+
 - Registers WebSocket command handlers called by the panel
 - Commands: `object_registry/list`, `object_registry/get`,
   `object_registry/create`, `object_registry/update`, `object_registry/delete`
 - Each handler validates input, calls the appropriate `registry.py` method,
   and sends result or error back to the panel
-- Also fires a HA event (`object_registry_updated`) after every successful
-  write so all open panel instances can detect concurrent changes
+- Note: the `object_registry_updated` HA event is fired from `registry.py`
+  after every successful write, not here — websocket handlers just call registry
+  methods and return results
 
 ### `services.yaml`
+
 - Defines `list_items`, `get_item`, `get_object` with Fields and Selectors
 - These are the automation/script interface — separate from WebSocket
 - See SPEC.md Section 6 for full content
 
 ### `strings.json`
+
 - UI copy for config flow steps and error messages
 - Follows HA's standard strings format
 
 ### `frontend/object-registry-panel.js`
+
 - Single-file vanilla `HTMLElement` — no Lit dependency, no build step required
 - Registered as `object-registry-panel` via `customElements.define()`
 - Uses Shadow DOM for style isolation
 - Receives `hass` object from HA frontend (set as property automatically)
+- `set hass` only triggers a load on first render or DOM wipe — never re-renders
+  on HA state heartbeats, which would destroy editor focus
 - Uses HA CSS custom properties for all colors, typography, and button styles
 - Uses `ha-code-editor` (CM6) for JSON editing — created programmatically
   before DOM append to avoid Lit async init timing issues
 - Uses native `<dialog>` element for confirmation dialogs
 - Communicates with backend exclusively via `this._hass.callWS({type: ...})`
 - Subscribes to `object_registry_updated` events for concurrent edit detection
-- Handles `hass` reconnection — re-renders if DOM was blanked during disconnect
+- Module-scope `visibilitychange` listener handles tab return after Chrome
+  background throttling — see Known Quirks below
 
 ---
 
 ## Data Flow
 
 ### Startup
+
 ```
 HA loads integration
   → __init__.async_setup_entry()
@@ -133,6 +149,7 @@ HA loads integration
 ```
 
 ### Automation reads an object
+
 ```
 automation calls service: object_registry.get_item
   → __init__ service handler
@@ -143,6 +160,7 @@ automation calls service: object_registry.get_item
 ```
 
 ### Panel creates an object
+
 ```
 panel calls this._hass.callWS({type: "object_registry/create", ...})
   → websocket.websocket_create()
@@ -159,6 +177,7 @@ other open panels receive event → show warning banner if editing same object
 ```
 
 ### Panel updates an object
+
 ```
 panel calls this._hass.callWS({type: "object_registry/update", ...})
   → websocket.websocket_update()
@@ -215,13 +234,13 @@ async def async_register_panel(hass):
 
 ## WebSocket Command Names
 
-| Command type string | Handler | Action |
-|---------------------|---------|--------|
-| `object_registry/list` | `websocket_list` | Returns all objects (metadata only) |
-| `object_registry/get` | `websocket_get` | Returns one full object by object_id or uuid |
-| `object_registry/create` | `websocket_create` | Creates a new object |
-| `object_registry/update` | `websocket_update` | Updates an existing object |
-| `object_registry/delete` | `websocket_delete` | Deletes an object |
+| Command type string      | Handler            | Action                                       |
+| ------------------------ | ------------------ | -------------------------------------------- |
+| `object_registry/list`   | `websocket_list`   | Returns all objects (metadata only)          |
+| `object_registry/get`    | `websocket_get`    | Returns one full object by object_id or uuid |
+| `object_registry/create` | `websocket_create` | Creates a new object                         |
+| `object_registry/update` | `websocket_update` | Updates an existing object                   |
+| `object_registry/delete` | `websocket_delete` | Deletes an object                            |
 
 > NOTE: These are internal panel ↔ backend commands, distinct from the
 > automation service interface (`list_items`, `get_item`, `get_object`).
@@ -252,17 +271,46 @@ weekend coders trying to contribute. HA's frontend serves the modern ES module
 build, so we can write modern JavaScript directly and import HA's own components
 without bundling.
 
+**Why is the `visibilitychange` listener at module scope, not in `connectedCallback`?**
+After ~5 minutes in a background tab, Chrome throttles JS execution and HA's
+`partial-panel-resolver` removes `<object-registry-panel>` from the DOM entirely.
+Any listener attached in `connectedCallback` dies with the element. By registering
+the listener at module scope (outside the class, before `customElements.define()`),
+it survives element removal and persists for the page lifetime. On tab return, it
+dispatches HA's own `location-changed` event (not `popstate` — HA's Lit router
+ignores that) to navigate away and back, forcing a clean remount. A `setTimeout`
+of 100ms between the two dispatches gives the Lit router one tick to process
+the navigate-away before the navigate-back arrives. The guard
+`window._objectRegistryVisibilityHandler` prevents double-registration across
+hot reloads.
+
+---
+
+## Known Quirks
+
+### `ha-code-editor` height in Shadow DOM
+
+`ha-code-editor` is a Lit element wrapping CodeMirror 6. Getting it to fill its
+container height requires injecting CSS directly into its Shadow DOM after it
+renders. This is done via a `setTimeout(() => { editor.shadowRoot.appendChild(style) }, 0)`
+in `_render()`. The target classes are `.cm-editor` (flex column) and
+`.cm-scroller` (flex: 1, overflow: auto). This is tribal knowledge — nothing in
+the CM6 or HA docs explains it.
+
 ---
 
 ## Pre-Publish Checklist
 
-| Item | Status | Notes |
-|------|--------|-------|
-| `const.py` | ✅ Complete | |
-| `websocket.py` | ✅ Complete | |
-| `frontend/object-registry-panel.js` | ✅ Complete | |
-| `hacs.json` | ⬜ Needed | Fill in before HACS submission |
-| `.github/workflows/validate.yml` | ⬜ Needed | hassfest + HACS validation CI |
-| `README.md` | ⬜ Needed | Installation, usage, examples |
-| `examples/basic_usage.yaml` | ⬜ Needed | Real ISY/Hue example automation |
-| First tagged release (`v0.1.0`) | ⬜ Needed | Required for HACS submission |
+| Item                                | Status      | Notes                           |
+| ----------------------------------- | ----------- | ------------------------------- |
+| `const.py`                          | ✅ Complete |                                 |
+| `registry.py`                       | ✅ Complete |                                 |
+| `storage.py`                        | ✅ Complete |                                 |
+| `websocket.py`                      | ✅ Complete |                                 |
+| `__init__.py`                       | ✅ Complete |                                 |
+| `frontend/object-registry-panel.js` | ✅ Complete |                                 |
+| `README.md`                         | ✅ Complete |                                 |
+| `hacs.json`                         | ⬜ Needed   | Fill in before HACS submission  |
+| `.github/workflows/validate.yml`    | ⬜ Needed   | hassfest + HACS validation CI   |
+| `examples/basic_usage.yaml`         | ⬜ Needed   | Real ISY/Hue example automation |
+| First tagged release (`v0.1.0`)     | ⬜ Needed   | Required for HACS submission    |

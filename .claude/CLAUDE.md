@@ -6,15 +6,18 @@
 in-memory object registry accessible from HA automations and scripts via service
 calls. Objects are JSON structures (Python dicts in memory) persisted via HA's
 native `homeassistant.helpers.storage.Store` interface. Managed via a custom
-sidebar panel built with Lit/HA web components. Distributed via HACS and GitHub.
+sidebar panel built as a vanilla `HTMLElement` — no Lit dependency, no build
+step. Distributed via HACS and GitHub.
 
 ## Current Status
 
 > **Update this section at the start of every working session.**
 
-Phase: **v1 feature complete — pre-HACS / pre-public**
-Working on: Bug fixing, UI polish, disappearing panel investigation.
-Next: HACS prep (`hacs.json`, CI workflow), README, first tagged release, go public.
+Phase: **v1 feature complete — ready for public feedback**
+Working on: `examples/basic_usage.yaml`, then HACS default store submission.
+Recent: All bugs fixed (focus loss in editor, disappearing panel after tab throttling).
+All docs locked (ARCHITECTURE, DESIGN, SPEC, README). CI green (hassfest + HACS validation passing).
+Next: Write ISY automation example, tag `v0.1.0`, submit to HACS default store.
 
 ## Canonical Docs — Read These First
 
@@ -41,10 +44,11 @@ When anything is ambiguous, ask before assuming — put the answer back in the d
    No clever patterns, no advanced meta-programming, no obscure stdlib tricks.
 2. **Vanilla Python.** No external deps. Use only HA built-in interfaces.
 3. **Minimal support surface.** Service interface is intentionally narrow.
-   Do not add flexibility that invites "here's my 200-line automation" issues.
+   Do not add flexibility that's unfriendly and drives support issues.
 4. **HA conventions.** Follow HA core patterns throughout — storage, config flow,
-   service registration, async, Lit web components, HA design tokens.
-5. **No backwards compatibility.** Targets HA 2026.4+ only.
+   service registration, async, HA design tokens, native HA widgets. Panel is
+   a vanilla `HTMLElement` — no Lit dependency, no build step.
+5. **No backwards compatibility for first release.** Targets HA 2026.4+ only.
 6. **Validate on submit, never on keystroke.** No live form validation.
 
 ## Integration Domain
@@ -106,9 +110,9 @@ When anything is ambiguous, ask before assuming — put the answer back in the d
 - Validate first, then update, then flush to Store — always in this order
 - `object_id` and `name` must both be unique across all objects
 - `object_id` must match `^[a-z0-9_]+$` (snake_case)
-- `uuid` is generated on create, never changes, never exposed in service calls
+- `uuid` is generated on create, never changes
 - Any change to any field updates the `updated` timestamp
-- Entire cache is flushed to Store on every write (not incremental)
+- Entire cache is flushed to HA's native custom integration Store pattern on every write (not incremental)
 
 ## Canonical Resources
 
@@ -117,6 +121,15 @@ When anything is ambiguous, ask before assuming — put the answer back in the d
 - Custom Panels: https://developers.home-assistant.io/docs/frontend/custom-ui/creating-custom-panels
 - HA Developer Docs: https://developers.home-assistant.io
 - HACS Publish Docs: https://hacs.xyz/docs/publish/start
+
+## Deploy Pipeline
+
+- `./deploy.sh` — sync all files to HAOS via scp, no restart
+- `./deploy.sh --restart` — sync + restart HA via API
+- `./deploy.sh --files frontend/object-registry-panel.js` — sync specific files
+- JS-only changes: deploy + hard refresh browser (`Cmd+Shift+R`), no restart needed
+- Python changes: `./deploy.sh --restart`
+- Credentials in `deploy.env` (gitignored — never commit)
 
 ## Commit Message Format
 

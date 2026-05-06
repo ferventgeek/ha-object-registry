@@ -1,36 +1,28 @@
-# Object Registry for Home Assistant
+# Object Registry Integration for Home Assistant
 
-> ⚠️ **Status: Feature complete but not yet recommended for production use.**
-> The integration is fully functional, with CRUD, real-time updates, concurrent edit
-> detection, and validation, but there is an outstanding issue with the custom panel
-> going blank after Chrome throttles background tabs. I am seeking guidance from
-> the HA frontend developer community before publishing to HACS.
-
----
+**Object Registry** is an integration for Home Assistant which provides a named,
+in-memory JSON object store accessible from any automation or script.
+Define your mapping or config data once, reuse it anywhere.
 
 ![Object Registry list view](docs/screenshots/ha-object-registry-list-view.png)
-
----
+_(Object list view)_
 
 ## What It Does
 
-Home Assistant has transformed what I can do with automation in my complex
-environment with a lot of legacy automation tech. But what I could not find was an easy way to create and manage
-configuration-style structured data. Think mapping tables, lookup references, and device relationships,
-without working directly with the file system or embedding it
-in automation YAML. (Example below) I was specifically looking for something
-GUI-driven, and cached for performance. This was my answer and hopefully isn't
-a duplicate of something better that already exists that I missed.
+Home Assistant has transformed what I can do in my home environment which has
+a complex mix of heterogeneous, "modern" (walled-garden) devices plus a lot of legacy automation tech.
+The only integration I didn't find was an easy tool to create and manage
+configuration-style structured data for use in automations and scripts.
+Think mapping tables, lookup references, and device relationships,
+but without working directly with the file system or embedding it
+in automation YAML.
 
-**Object Registry** provides a named, in-memory JSON object store accessible from
-any automation or script via service calls. Define your mapping or config data once, reuse it anywhere.
-
-**A concrete example:** An ISY/Eisy controller manages legacy Insteon and Z-Wave
+**A concrete example:** An ISY/Eisy controller manages a fleet of legacy Insteon and Z-Wave
 devices pretty well, especially Insteon native table links. However, wiring up five different ISY remote button
-events to the Hue light actions specific to different devices
-requires a mapping layer. Without a registry, that mapping is hardcoded across
-automations and prone to breakage. With Object Registry, a single service call retrieves a
-mapping object making automations short, readable, and more reusable.
+event types to Hue, fan, pool, door openers, and more
+needs an easy to edit relationship mapping layer. Without a registry, that mapping is hardcoded across
+automations and prone to breakage. With Object Registry, YAML service calls retrieve named
+native mapping objects to make automations easier to manage and more reusable.
 
 ### Capabilities
 
@@ -47,17 +39,16 @@ mapping object making automations short, readable, and more reusable.
   existing automations may break
 - **Persistent storage** — objects survive HA restarts via HA's native Store
   interface
-- **HACS-ready** — structured for easy community installation once stable
+- **HACS-ready** — structured for easy community installation
 
----
+<br/>
 
 ![Object Registry editor view](docs/screenshots/ha-object-registry-edit-view.png)
-
----
+_Object edit view_
 
 ## Installation
 
-> Not yet available in HACS default store. Manual installation only for now.
+> Not yet available in HACS default store, but I'm working on it. Manual installation only for now.
 
 ### Manual via HACS (custom repository)
 
@@ -72,8 +63,6 @@ mapping object making automations short, readable, and more reusable.
 1. Copy `custom_components/object_registry/` into your HA `config/custom_components/` directory
 2. Restart Home Assistant
 3. Go to Settings → Integrations → Add Integration → **Object Registry**
-
----
 
 ## Usage
 
@@ -92,7 +81,7 @@ action: object_registry.get_item
 data:
   object_id: isy_button_map
 response_variable: result
-# result.data contains your JSON payload
+# result.data contains your JSON payload as an object accessible via dot notation
 ```
 
 **Get the full object including metadata** — returns the payload plus `uuid`,
@@ -103,8 +92,8 @@ action: object_registry.get_object
 data:
   object_id: isy_button_map
 response_variable: result
-# result.data contains your JSON payload
-# result.name, result.updated, etc. also available
+# result.data contains your object including its internal metadata
+# like it's uuid, date created, date updated, etc.
 ```
 
 **List all objects (metadata only, no payload):**
@@ -114,48 +103,34 @@ action: object_registry.list_items
 response_variable: result
 ```
 
-See [`examples/basic_usage.yaml`](examples/basic_usage.yaml) for a complete
-automation example. More examples coming based on community feedback.
-
----
-
-## Known Issues
-
-### Panel goes blank after background tab throttling
-
-After approximately 5 minutes in a background browser tab, Chrome throttles
-JavaScript execution. HA's `partial-panel-resolver` removes the custom panel
-element from the DOM during this period. On tab return, the panel stays blank
-until the user clicks another sidebar item and returns.
-
-I've tried everything I can think of, but JS framework messaging is a nemesis for me second only to CSS.
-I am making it public early and seeking input from the HA frontend developer community
-on the correct lifecycle hook for this situation. I'm sure others have worked around the issue of blanking
-when the browser throttles background updates when the panel is not in the focused tab.
-
-**Workaround:** Click any other sidebar item and back to Object Registry again, or refresh the page.
-The panel reloads immediately.
-
----
+More HA YAML examples coming based on community feedback.
 
 ## Requirements
 
 - Home Assistant 2026.4 or later
 - No external dependencies
 
----
-
 ## Development
 
 This project was built using a design-doc-first methodology with AI assistance.
 See [`docs/`](docs/) for full architecture, design philosophy, and specification
-documents.
+documents. In past projects I've been _selective_ about commit visibility but in
+this case you'll find the full, verbose change history and commit messages
+in case you're curious about how it came together using a design-driven approach with
+Claude doing the bulk of the code at my direction.
+
+I'm increasingly convinced
+AI is the renaissance of a Balrog skill from the agile before-times: SDD (SRD, and SDS).
+Before writing a single line of code, invest first in formal research, design, and documentation
+so the AI knows what the vision and contract goals are. Bottom-up, iterative AI
+can snowball small hallucinations and false confidence into a tangled mess that's hard
+to comprehend and debug. Design-driven, top-down seems to produce better outcomes.
 
 The code is intentionally written for readability. I've tried to keep the code
 understandable by casual coders like me without external references. No build
-step, no external dependencies, no advanced patterns.
-
----
+step, no external dependencies, no advanced patterns. There is a bit more hair
+in some of the JavaScript and CSS in the panel code than I'd like, but I'm more
+of an automation and backend nerd. UI is necessary evil not passion for me.
 
 ## Gratitude
 
@@ -165,10 +140,14 @@ developers sharing patterns and answering questions made this project possible.
 This is my first HA integration and I could not have gotten this far without the
 foundation the community has built. Thank you so much!
 
----
+> [!TIP]
+> I can't wait to see how you'll use the Object Registry- please share your examples and suggestions.
 
 ## License
 
 MIT — see [LICENSE](LICENSE)
 
+<br/>
+
 ![Object Registry integration view](docs/screenshots/ha-object-registry-integration-view.png)
+_(Integration page view)_
