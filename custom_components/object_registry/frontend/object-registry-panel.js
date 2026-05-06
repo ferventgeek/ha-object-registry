@@ -1403,14 +1403,19 @@ if (!window._objectRegistryVisibilityHandler) {
     // Navigate away then back using HA's router event.
     // Two dispatches are required: the first moves the router off this
     // route, the second brings it back — triggering a full remount.
+    // setTimeout between them gives the Lit router one tick to process
+    // the navigate-away before we send the navigate-back. Without this
+    // the router batches both events and ignores the round-trip.
     window.history.pushState(null, "", "/");
     window.dispatchEvent(
       new CustomEvent("location-changed", { bubbles: true })
     );
-    window.history.pushState(null, "", "/object_registry");
-    window.dispatchEvent(
-      new CustomEvent("location-changed", { bubbles: true })
-    );
+    setTimeout(() => {
+      window.history.pushState(null, "", "/object_registry");
+      window.dispatchEvent(
+        new CustomEvent("location-changed", { bubbles: true })
+      );
+    }, 100);
   };
   document.addEventListener(
     "visibilitychange",
