@@ -58,10 +58,11 @@ The service interface is intentionally narrow: `list_items`, `get_item`,
 `get_object`. We do not expose internal implementation details, provide helper
 methods for processing returned data, or accept automation logic as input.
 
-This boundary is critical: when a user files a GitHub issue, I want to help users
-delineate where an issue might lie at the outset. Is HA-specific or from the Object Registry specifically?
+This boundary is critical: if a user considers opening a GitHub issue, I want to help them
+delineate where an issue might lie at the outset. Is it HA-specific or from the Object Registry specifically?
 Ambiguity of that demarcation can frustrate users and a narrow interface makes that line more obvious.
-I'm not an HA expert by any means and if there's an implementation issue which can be solved
+I'm not an HA expert by any means and if is's an HA implementation issue I want to get users
+to HA experts who can help.
 
 ### One file, one job
 
