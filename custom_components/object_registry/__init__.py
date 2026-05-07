@@ -67,7 +67,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     Called by HA when the user removes the integration or HA shuts down.
     """
     hass.services.async_remove(DOMAIN, "list_items")
-    hass.services.async_remove(DOMAIN, "get_item")
+    hass.services.async_remove(DOMAIN, "get_data")
     hass.services.async_remove(DOMAIN, "get_object")
 
     hass.data.pop(DOMAIN, None)
@@ -88,7 +88,7 @@ def _register_services(hass: HomeAssistant) -> None:
         registry: ObjectRegistry = hass.data[DOMAIN]
         return {"objects": registry.get_all_metadata()}
 
-    async def handle_get_item(call: ServiceCall) -> dict[str, Any]:
+    async def handle_get_data(call: ServiceCall) -> dict[str, Any]:
         """Return the data payload for a single object."""
         registry: ObjectRegistry = hass.data[DOMAIN]
 
@@ -145,7 +145,7 @@ def _register_services(hass: HomeAssistant) -> None:
         supports_response=SupportsResponse.ONLY
     )
     hass.services.async_register(
-        DOMAIN, "get_item", handle_get_item,
+        DOMAIN, "get_data", handle_get_data,
         supports_response=SupportsResponse.ONLY
     )
     hass.services.async_register(

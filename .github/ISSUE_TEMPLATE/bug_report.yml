@@ -1,0 +1,73 @@
+name: Bug Report
+description: Report a bug with the HA Object Registry integration
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! The more context you include here, the faster we can help. Screenshots and file attachments are welcome — just drag and drop into any text field.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you submit
+      options:
+        - label: I am running the latest supported version as listed in the [README](../../blob/main/README.md)
+          required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where is the issue?
+      options:
+        - Panel / UI
+        - Automations or Scripts
+        - Both
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: basic_checks
+    attributes:
+      label: Basic checks
+      description: Tick whichever applies to your issue.
+      options:
+        - label: "**Panel / UI** — I have restarted Home Assistant and hard-refreshed my browser (Ctrl+Shift+R / Cmd+Shift+R)"
+        - label: "**Automations / Scripts** — I have reproduced the issue using the minimal test script below"
+
+  - type: markdown
+    attributes:
+      value: |
+        **Minimal test script** — if your issue involves accessing an object, please try this first and include the output:
+        ```yaml
+        sequence:
+          - action: object_registry.get_object
+            data:
+              object_id: "your_test_object_id"
+            response_variable: result
+          - action: persistent_notification.create
+            data:
+              title: "Object Registry Test"
+              message: "{{ result }}"
+        ```
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug. Screenshots welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Any other context?
+      description: HA version, browser, anything else that might be helpful to zero in quickly.

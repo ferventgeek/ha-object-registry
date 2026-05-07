@@ -1,0 +1,30 @@
+name: Feature Request
+description: Suggest an improvement or new feature
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea? We'd love to hear it. Keep in mind this is a small one-person project. I love to get your ideas, and the best requests are focused and explain the problem they solve.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation where you ran into a limitation or gap.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to see?
+      description: Describe your idea. Screenshots, HA config examples, or mockups welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Have you found any workarounds or other HA integrations/tools that do this well?
+      description: Optional — but useful context if you have.

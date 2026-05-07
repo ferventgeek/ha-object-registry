@@ -63,7 +63,7 @@ These rules are enforced on every create and update before any write occurs:
 **Metadata** — returned by `list_items`, included in `get_object`:
 `uuid`, `object_id`, `name`, `description`, `type`, `created`, `updated`
 
-**Payload** — returned by `get_item`, included in `get_object`:
+**Payload** — returned by `get_data`, included in `get_object`:
 `data`
 
 ---
@@ -107,7 +107,7 @@ action:
 
 ---
 
-### 2.2 `get_item`
+### 2.2 `get_data`
 
 Returns the `data` payload for a single object, looked up by `object_id` or `uuid`.
 
@@ -156,7 +156,7 @@ fields:
 
 ```yaml
 action:
-  - service: object_registry.get_item
+  - service: object_registry.get_data
     data:
       object_id: isy_hue_map
     response_variable: hue_map
@@ -171,7 +171,7 @@ Returns the full object — both metadata and payload — for a single object.
 **Purpose:** Convenience method for cases where automations need both the
 metadata (e.g. `updated` timestamp) and the data payload together.
 
-**Inputs:** Same as `get_item` — `object_id` or `uuid`.
+**Inputs:** Same as `get_data` — `object_id` or `uuid`.
 
 **Output:** The full object dict including all metadata fields and `data`.
 
@@ -191,7 +191,7 @@ data:
       xy_color: [0.2335, 0.435]
 ```
 
-**Error cases:** Same as `get_item`.
+**Error cases:** Same as `get_data`.
 
 **Example automation usage:**
 
@@ -468,7 +468,7 @@ list_items:
   description: Returns metadata for all objects in the registry.
   fields: {}
 
-get_item:
+get_data:
   name: Get Item
   description: Returns the data payload for a single object.
   fields:

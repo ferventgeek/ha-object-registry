@@ -102,7 +102,7 @@ When anything is ambiguous, ask before assuming — put the answer back in the d
 | Service                      | Input                 | Returns                                  |
 | ---------------------------- | --------------------- | ---------------------------------------- |
 | `object_registry.list_items` | none                  | List of metadata dicts (no data payload) |
-| `object_registry.get_item`   | `object_id` or `uuid` | Single `data` payload dict               |
+| `object_registry.get_data`   | `object_id` or `uuid` | Single `data` payload dict               |
 | `object_registry.get_object` | `object_id` or `uuid` | Full object (metadata + data)            |
 
 ## CRUD Rules

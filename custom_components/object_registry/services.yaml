@@ -4,8 +4,8 @@ list_items:
     Returns metadata for all objects in the registry.
     Does not include the data payload of each object.
 
-get_item:
-  name: Get Item
+get_data:
+  name: Get Data
   description: >
     Returns the data payload for a single object.
     Provide either object_id or uuid — not both.

@@ -131,6 +131,7 @@ fi
 if [[ ${#FILES[@]} -eq 0 ]]; then
   # Copy entire integration folder
   echo "[1/2] Copying all files to HAOS..."
+  find "${LOCAL_SRC}" -name ".DS_Store" -delete # Remove macOS metadata files
   scp -r "${LOCAL_SRC}/." "${REMOTE_HOST}:${REMOTE_PATH}/"
   echo "      Done."
 else

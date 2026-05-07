@@ -27,7 +27,7 @@ native mapping objects to make automations easier to manage and more reusable.
 ### Capabilities
 
 - **In-memory object store** — named JSON objects accessible from automations and
-  scripts via `object_registry.get_item`, `get_object`, and `list_items`
+  scripts via `object_registry.get_data`, `get_object`, and `list_items`
 - **Native HA panel** — full management UI in the sidebar, no file editing required
 - **Real-time live updates** — the panel list updates instantly when any object
   changes, even from another browser window
@@ -77,7 +77,7 @@ Use objects in automations and scripts via three service calls:
 directly in templates. This is what most automations need:
 
 ```yaml
-action: object_registry.get_item
+action: object_registry.get_data
 data:
   object_id: isy_button_map
 response_variable: result

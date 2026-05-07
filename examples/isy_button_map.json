@@ -1,0 +1,227 @@
+{
+  "sensor.main_left_remote_a_b": {
+    "target": "light.main_bedroom",
+    "controls": {
+      "DON": {
+        "action": "light.turn_on"
+      },
+      "DOF": {
+        "action": "light.turn_off"
+      },
+      "DFON": {
+        "action": "light.turn_on",
+        "data": {
+          "brightness_pct": 100,
+          "xy_color": [
+            0.422,
+            0.399
+          ],
+          "transition": 0.1
+        }
+      },
+      "DFOF": {
+        "action": "light.turn_on",
+        "data": {
+          "color_temp_kelvin": 2710,
+          "brightness": 122,
+          "transition": 2
+        }
+      },
+      "FDUP": {
+        "action": "hue_dimmer.raise",
+        "data": {
+          "sweep_time": 8
+        }
+      },
+      "FDDOWN": {
+        "action": "hue_dimmer.lower",
+        "data": {
+          "sweep_time": 8
+        }
+      },
+      "FDSTOP": {
+        "action": "hue_dimmer.stop"
+      }
+    }
+  },
+  "sensor.main_right_remote_a_b": {
+    "target": "light.main_bedroom",
+    "controls": {
+      "DON": {
+        "action": "light.turn_on"
+      },
+      "DOF": {
+        "action": "light.turn_off"
+      },
+      "DFON": {
+        "action": "light.turn_on",
+        "data": {
+          "brightness_pct": 100,
+          "xy_color": [
+            0.422,
+            0.399
+          ],
+          "transition": 0.1
+        }
+      },
+      "DFOF": {
+        "action": "light.turn_on",
+        "data": {
+          "color_temp_kelvin": 2710,
+          "brightness": 122,
+          "transition": 2
+        }
+      },
+      "FDUP": {
+        "action": "hue_dimmer.raise",
+        "data": {
+          "sweep_time": 8
+        }
+      },
+      "FDDOWN": {
+        "action": "hue_dimmer.lower",
+        "data": {
+          "sweep_time": 8
+        }
+      },
+      "FDSTOP": {
+        "action": "hue_dimmer.stop"
+      }
+    }
+  },
+  "sensor.main_bedroom_8btn_switch_c": {
+    "target": "light.main_bedroom",
+    "controls": {
+      "DON": {
+        "action": "light.turn_on"
+      },
+      "DOF": {
+        "action": "light.turn_off"
+      },
+      "DFON": {
+        "action": "light.turn_on",
+        "data": {
+          "brightness_pct": 100,
+          "xy_color": [
+            0.422,
+            0.399
+          ],
+          "transition": 0.1
+        }
+      },
+      "DFOF": {
+        "action": "light.turn_on",
+        "data": {
+          "color_temp_kelvin": 2710,
+          "brightness": 122,
+          "transition": 2
+        }
+      },
+      "FDUP": {
+        "action": "hue_dimmer.raise",
+        "data": {
+          "sweep_time": 8
+        }
+      },
+      "FDDOWN": {
+        "action": "hue_dimmer.lower",
+        "data": {
+          "sweep_time": 8
+        }
+      },
+      "FDSTOP": {
+        "action": "hue_dimmer.stop"
+      }
+    }
+  },
+  "sensor.office_remote_b": {
+    "target": "light.office",
+    "controls": {
+      "DON": {
+        "action": "light.turn_on"
+      },
+      "DOF": {
+        "action": "light.turn_off"
+      },
+      "DFON": {
+        "action": "light.turn_on",
+        "data": {
+          "brightness_pct": 100,
+          "xy_color": [
+            0.422,
+            0.399
+          ],
+          "transition": 0.1
+        }
+      },
+      "DFOF": {
+        "action": "light.turn_on",
+        "data": {
+          "color_temp_kelvin": 2710,
+          "brightness": 122,
+          "transition": 2
+        }
+      },
+      "FDUP": {
+        "action": "hue_dimmer.raise",
+        "data": {
+          "sweep_time": 8
+        }
+      },
+      "FDDOWN": {
+        "action": "hue_dimmer.lower",
+        "data": {
+          "sweep_time": 8
+        }
+      },
+      "FDSTOP": {
+        "action": "hue_dimmer.stop"
+      }
+    }
+  },
+  "sensor.guest_remote_a": {
+    "target": "light.guest_bedside",
+    "controls": {
+      "DON": {
+        "action": "light.turn_on"
+      },
+      "DOF": {
+        "action": "light.turn_off"
+      },
+      "DFON": {
+        "action": "light.turn_on",
+        "data": {
+          "brightness_pct": 100,
+          "xy_color": [
+            0.422,
+            0.399
+          ],
+          "transition": 0.1
+        }
+      },
+      "DFOF": {
+        "action": "light.turn_on",
+        "data": {
+          "color_temp_kelvin": 2710,
+          "brightness": 122,
+          "transition": 2
+        }
+      },
+      "FDUP": {
+        "action": "hue_dimmer.raise",
+        "data": {
+          "sweep_time": 8
+        }
+      },
+      "FDDOWN": {
+        "action": "hue_dimmer.lower",
+        "data": {
+          "sweep_time": 8
+        }
+      },
+      "FDSTOP": {
+        "action": "hue_dimmer.stop"
+      }
+    }
+  }
+}

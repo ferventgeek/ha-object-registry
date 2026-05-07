@@ -1,0 +1,67 @@
+alias: ISY Insteon Remote Router
+description: >
+  Routes ISY remote button events to HA actions via the Object Registry. All
+  mapping config lives in the isy_button_map registry object.
+triggers:
+  - trigger: event
+    event_type: isy994_control
+conditions: []
+actions:
+  - variables:
+      source_entity: "{{ trigger.event.data.entity_id | default('') }}"
+      control: "{{ trigger.event.data.control | default('') }}"
+      source_labels: "{{ labels(source_entity) if source_entity else [] }}"
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: |-
+              {{ source_entity != ''
+                 and control != ''
+                 and 'isy_insteon_remote_button' in source_labels }}
+        sequence:
+          - action: object_registry.get_data
+            data:
+              object_id: isy_button_map
+            response_variable: button_map
+          - variables:
+              mapping: "{{ button_map.get('data', {}) }}"
+          - variables:
+              remote_config: "{{ mapping.get(source_entity, {}) }}"
+          - variables:
+              target_entity: "{{ remote_config.get('target', '') }}"
+              control_config: "{{ remote_config.get('controls', {}).get(control, {}) }}"
+          - variables:
+              mapped_action: "{{ control_config.get('action', '') }}"
+              action_data: "{{ control_config.get('data', {}) }}"
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: |-
+                      {{ mapped_action != ''
+                         and target_entity != ''
+                         and action_data is mapping
+                         and action_data | count > 0 }}
+                sequence:
+                  - action: "{{ mapped_action }}"
+                    target:
+                      entity_id: "{{ target_entity }}"
+                    data: "{{ action_data }}"
+              - conditions:
+                  - condition: template
+                    value_template: |-
+                      {{ mapped_action != ''
+                         and target_entity != '' }}
+                sequence:
+                  - action: "{{ mapped_action }}"
+                    target:
+                      entity_id: "{{ target_entity }}"
+            default:
+              - action: persistent_notification.create
+                data:
+                  title: ISY Router Unhandled
+                  message: >-
+                    No mapping found for control {{ control }} from {{
+                    source_entity }}.
+    default: []
+mode: queued
+max: 20

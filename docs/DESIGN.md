@@ -13,7 +13,7 @@ Z-Wave devices alongside newer HA-native devices. Connecting ISY device events
 (button presses, fast-on signals, press-and-hold dimming) to the correct HA
 action requires a mapping layer. Without a registry, that mapping lives as
 hardcoded YAML spread across dozens of automations. With a registry, an
-automation can call `object_registry.get_item` with `object_id: isy_hue_map`,
+automation can call `object_registry.get_data` with `object_id: isy_hue_map`,
 get back the mapping data, and act on it dynamically — making the automation
 short, readable, and reusable across any number of devices.
 
@@ -54,7 +54,7 @@ clear, well-organized code, advanced Python or JavaScript technique.
 
 ### Minimal support surface
 
-The service interface is intentionally narrow: `list_items`, `get_item`,
+The service interface is intentionally narrow: `list_items`, `get_data`,
 `get_object`. We do not expose internal implementation details, provide helper
 methods for processing returned data, or accept automation logic as input.
 

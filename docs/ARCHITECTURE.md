@@ -28,7 +28,7 @@ custom_components/object_registry/
 ├── registry.py       ← In-memory cache, CRUD operations
 ├── storage.py        ← Load/save via homeassistant.helpers.storage.Store
 ├── websocket.py      ← WebSocket command handlers (panel ↔ backend)
-├── services.yaml     ← Service definitions (list_items, get_item, get_object)
+├── services.yaml     ← Service definitions (list_items, get_data, get_object)
 ├── strings.json      ← UI strings for config flow
 │
 └── frontend/
@@ -47,7 +47,7 @@ custom_components/object_registry/
 - Calls `async_setup_entry()` — the HA entry point for config-entry-based integrations
 - Instantiates `ObjectRegistry` (from `registry.py`) and stores it on `hass.data`
 - Loads persisted data via `storage.py` on startup
-- Registers the three service calls (`list_items`, `get_item`, `get_object`)
+- Registers the three service calls (`list_items`, `get_data`, `get_object`)
 - Registers WebSocket commands via `websocket.py`
 - Registers the sidebar panel and its static file path
 - Calls `async_unload_entry()` on shutdown — cleans up services and panel
@@ -103,7 +103,7 @@ custom_components/object_registry/
 
 ### `services.yaml`
 
-- Defines `list_items`, `get_item`, `get_object` with Fields and Selectors
+- Defines `list_items`, `get_data`, `get_object` with Fields and Selectors
 - These are the automation/script interface — separate from WebSocket
 - See SPEC.md Section 6 for full content
 
@@ -142,7 +142,7 @@ HA loads integration
       → reads Store JSON from disk
     → registry.load(data)
       → populates _objects and rebuilds _index
-    → registers services (list_items, get_item, get_object)
+    → registers services (list_items, get_data, get_object)
     → registers WebSocket commands
     → registers static path for frontend/
     → registers sidebar panel
@@ -151,7 +151,7 @@ HA loads integration
 ### Automation reads an object
 
 ```
-automation calls service: object_registry.get_item
+automation calls service: object_registry.get_data
   → __init__ service handler
     → registry.get_by_id(object_id)
       → looks up uuid in _index
@@ -243,7 +243,7 @@ async def async_register_panel(hass):
 | `object_registry/delete` | `websocket_delete` | Deletes an object                            |
 
 > NOTE: These are internal panel ↔ backend commands, distinct from the
-> automation service interface (`list_items`, `get_item`, `get_object`).
+> automation service interface (`list_items`, `get_data`, `get_object`).
 > Do not conflate them.
 
 ---
