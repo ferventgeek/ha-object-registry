@@ -4,8 +4,8 @@
 in-memory JSON object store accessible from any automation or script.
 Define your mapping or config data once, reuse it anywhere.
 
-![Object Registry list view](docs/screenshots/ha-object-registry-list-view.png)
-_(Object list view)_
+![Object Registry editor view](docs/screenshots/ha-object-registry-edit-view.png)
+_Object edit view_
 
 ## What It Does
 
@@ -43,8 +43,8 @@ native mapping objects to make automations easier to manage and more reusable.
 
 <br/>
 
-![Object Registry editor view](docs/screenshots/ha-object-registry-edit-view.png)
-_Object edit view_
+![Object Registry list view](docs/screenshots/ha-object-registry-list-view.png)
+_(Object list view)_
 
 ## Installation
 
